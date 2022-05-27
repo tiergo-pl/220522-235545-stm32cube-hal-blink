@@ -20,7 +20,7 @@
 #error "Unsupported STM32 Family"
 #endif
 
-#ifdef BLUEPILL
+#ifdef BLUEPILL_FAKE
 #define LED_PIN GPIO_PIN_13
 #define LED_GPIO_PORT GPIOC
 #define LED_GPIO_CLK_ENABLE() __HAL_RCC_GPIOC_CLK_ENABLE()
@@ -31,9 +31,14 @@
 #define LED_GPIO_CLK_ENABLE() __HAL_RCC_GPIOA_CLK_ENABLE()
 #endif
 
+//#include "usb_device.h"
+
+void Error_Handler(void);
+void SystemClock_Config(void);
+
 int main(void)
 {
-#ifdef BLUEPILL
+#ifdef BLUEPILL_FAKE
   // SystemCoreClock = 8000000;
 #endif
   HAL_Init();
@@ -48,6 +53,9 @@ int main(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(LED_GPIO_PORT, &GPIO_InitStruct);
+
+  //MX_USB_DEVICE_Init();
+
   int counter = 10;
 
   while (1)
@@ -55,8 +63,8 @@ int main(void)
     HAL_GPIO_TogglePin(LED_GPIO_PORT, LED_PIN);
 
     HAL_Delay(counter);
-    counter *= 1.2;
-    if (counter > 500)
+    counter *= 1.1;
+    if (counter > 1000)
       counter = 10;
   }
 }
@@ -109,10 +117,15 @@ void DebugMon_Handler(void)
 void PendSV_Handler(void)
 {
 }
+/**
+ * @brief System Clock Configuration
+ * @retval None
+ */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
    * in the RCC_OscInitTypeDef structure.
@@ -126,7 +139,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
-    // Error_Handler();
+    Error_Handler();
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
@@ -139,6 +152,24 @@ void SystemClock_Config(void)
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
-    // Error_Handler();
+    Error_Handler();
   }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
+  PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
+  /* USER CODE END Error_Handler_Debug */
 }
