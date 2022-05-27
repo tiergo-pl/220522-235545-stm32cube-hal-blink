@@ -30,12 +30,22 @@
 #define LED_GPIO_PORT GPIOA
 #define LED_GPIO_CLK_ENABLE() __HAL_RCC_GPIOA_CLK_ENABLE()
 #endif
+#define COUNTER_STARTVAL 100
 
 //#include "usb_device.h"
 
 void Error_Handler(void);
 void SystemClock_Config(void);
-
+int _write(int32_t file, uint8_t *ptr, int32_t len)
+{
+  /* Implement your write code here, this is used by puts and printf for example */
+  int i = 0;
+  for (i = 0; i < len; i++)
+  {
+    ITM_SendChar((*ptr++));
+  }
+  return len;
+}
 int main(void)
 {
 #ifdef BLUEPILL_FAKE
@@ -54,18 +64,20 @@ int main(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(LED_GPIO_PORT, &GPIO_InitStruct);
 
-  //MX_USB_DEVICE_Init();
-
-  int counter = 10;
+  // MX_USB_DEVICE_Init();
+  int counter = COUNTER_STARTVAL;
 
   while (1)
   {
     HAL_GPIO_TogglePin(LED_GPIO_PORT, LED_PIN);
 
     HAL_Delay(counter);
-    counter *= 1.1;
-    if (counter > 1000)
-      counter = 10;
+    counter *= 1.2;
+    if (counter > 500)
+    {
+      counter = COUNTER_STARTVAL;
+      printf("SysTick= %u\r\n", HAL_GetTick());
+    }
   }
 }
 
@@ -161,7 +173,6 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 }
-
 
 void Error_Handler(void)
 {
