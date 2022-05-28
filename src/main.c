@@ -24,21 +24,28 @@
 #define LED_PIN GPIO_PIN_13
 #define LED_GPIO_PORT GPIOC
 #define LED_GPIO_CLK_ENABLE() __HAL_RCC_GPIOC_CLK_ENABLE()
+#define LED_DEBUG GPIOA, GPIO_PIN_12
+#define LED_DEBUG_MODE GPIO_MODE_OUTPUT_PP, GPIO_PULL, GPIO_SPEED_FREQ_LOW
+#define BUZZER GPIOB, GPIO_PIN_5
+#define BUZZER_MODE GPIO_MODE_OUTPUT_PP, GPIO_PULLUP, GPIO_SPEED_FREQ_LOW
 
 #else
 #define LED_PIN GPIO_PIN_5
 #define LED_GPIO_PORT GPIOA
 #define LED_GPIO_CLK_ENABLE() __HAL_RCC_GPIOA_CLK_ENABLE()
 #endif
-#define COUNTER_STARTVAL 100
+#define PERIOD1 500
+#define PERIOD2 2000
 
 //#include "usb_device.h"
+#include <stdio.h>
+#include "pins.h"
 
 void Error_Handler(void);
 void SystemClock_Config(void);
+
 int _write(int32_t file, uint8_t *ptr, int32_t len)
 {
-  /* Implement your write code here, this is used by puts and printf for example */
   int i = 0;
   for (i = 0; i < len; i++)
   {
@@ -60,25 +67,40 @@ int main(void)
 
   GPIO_InitStruct.Pin = LED_PIN;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_PORT, &GPIO_InitStruct);
 
+  pinSetup(LED_DEBUG, LED_DEBUG_MODE);
+  pinSetup(BUZZER, BUZZER_MODE);
   // MX_USB_DEVICE_Init();
-  int counter = COUNTER_STARTVAL;
 
+  uint32_t fastCounter = 0;
+  uint32_t prevFastCounter = 0;
+  uint32_t prevTickValue1 = 0;
+  uint32_t period1 = PERIOD1;
+  uint32_t prevTickValue2 = 0;
+  uint32_t period2 = PERIOD2;
+  printf("HalVersion= %lu; RevID= %lu; DevID= %lu\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID());
   while (1)
   {
-    HAL_GPIO_TogglePin(LED_GPIO_PORT, LED_PIN);
 
-    HAL_Delay(counter);
-    counter *= 1.2;
-    if (counter > 500)
+    if ((HAL_GetTick() - prevTickValue1) >= period1)
     {
-      counter = COUNTER_STARTVAL;
-      printf("SysTick= %u\r\n", HAL_GetTick());
+      prevTickValue1 = HAL_GetTick();
+      HAL_GPIO_TogglePin(LED_GPIO_PORT, LED_PIN);
+      printf("SysTick= %lu; LED toggled. fastCounter= %lu, fastCounter cycles= %lu\r\n", HAL_GetTick(), fastCounter, fastCounter - prevFastCounter);
+      prevFastCounter = fastCounter;
     }
-  }
+    if ((HAL_GetTick() - prevTickValue2) >= period2)
+    {
+      prevTickValue2 = HAL_GetTick();
+      HAL_GPIO_TogglePin(LED_DEBUG);
+      HAL_GPIO_TogglePin(BUZZER);
+      printf("SysTick= %lu; %s and %s toggled. fastCounter= %lu, \r\n", HAL_GetTick(), "LED_DEBUG", "BUZZER", fastCounter);
+    }
+    fastCounter++;
+    }
 }
 
 void SysTick_Handler(void)
