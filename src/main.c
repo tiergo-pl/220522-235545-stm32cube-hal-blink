@@ -35,7 +35,8 @@
 #define LED_GPIO_CLK_ENABLE() __HAL_RCC_GPIOA_CLK_ENABLE()
 #endif
 #define PERIOD1 500
-#define PERIOD2 2000
+#define PERIOD2 1000
+#define DUTY2 5
 
 //#include "usb_device.h"
 #include <stdio.h>
@@ -81,6 +82,8 @@ int main(void)
   uint32_t period1 = PERIOD1;
   uint32_t prevTickValue2 = 0;
   uint32_t period2 = PERIOD2;
+  uint32_t duty2 = DUTY2;
+  uint32_t nextEndTick2 = period2;
   printf("HalVersion= %lu; RevID= %lu; DevID= %lu\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID());
   while (1)
   {
@@ -95,11 +98,17 @@ int main(void)
     if ((HAL_GetTick() - prevTickValue2) >= period2)
     {
       prevTickValue2 = HAL_GetTick();
+      nextEndTick2 = prevTickValue2 + duty2*period2/100;
       HAL_GPIO_TogglePin(LED_DEBUG);
-      HAL_GPIO_TogglePin(BUZZER);
-      printf("SysTick= %lu; %s and %s toggled. fastCounter= %lu, \r\n", HAL_GetTick(), "LED_DEBUG", "BUZZER", fastCounter);
+      HAL_GPIO_WritePin(BUZZER, GPIO_PIN_SET);
+      printf("SysTick= %lu; %s and %s toggled. next= %lu, fastCounter= %lu, \r\n", HAL_GetTick(), "LED_DEBUG", "BUZZER", nextEndTick2, fastCounter);
     }
-    fastCounter++;
+    if (HAL_GetTick() >= nextEndTick2)
+    {
+      nextEndTick2 += period2;
+      HAL_GPIO_WritePin(BUZZER, GPIO_PIN_RESET);
+    }
+      fastCounter++;
     }
 }
 
