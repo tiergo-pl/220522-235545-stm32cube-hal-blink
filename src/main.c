@@ -54,6 +54,52 @@ int _write(int32_t file, uint8_t *ptr, int32_t len)
   }
   return len;
 }
+typedef struct
+{
+  uint32_t period;
+  uint32_t duty;
+  void (*funcStart)(void);
+  void (*funcEnd)(void);
+  uint32_t start;
+  uint32_t end;
+} cycleTimer;
+void cycleTimer_execute(cycleTimer *timer)
+{
+  if (HAL_GetTick() >= timer->start)
+  {
+    //printf("timer->start= %lu, timer->period= %lu\t", timer->start, timer->period);
+    timer->end = timer->start + timer->duty * timer->period / 100;
+    timer->start += timer->period;
+    //printf("timer->start= %lu, timer->end= %lu\r\n", timer->start, timer->end);
+
+    if (timer->funcStart != NULL)
+    {
+      timer->funcStart();
+    }
+  }
+  if (HAL_GetTick() >= timer->end)
+  {
+    //printf("timer->end= %lu\t", timer->end);
+    timer->end += timer->period;
+    //printf("timer->end= %lu\r\n", timer->end);
+
+    if (timer->funcEnd != NULL)
+    {
+      timer->funcEnd();
+    }
+  }
+}
+void ledDebugSet()
+{
+  HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_SET);
+  printf("SysTick= %lu; LED_DEBUG HIGH\r\n", HAL_GetTick());
+}
+void ledDebugReset()
+{
+  HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_RESET);
+  printf("SysTick= %lu; LED_DEBUG LOW\r\n", HAL_GetTick());
+}
+
 int main(void)
 {
 #ifdef BLUEPILL_FAKE
@@ -84,6 +130,8 @@ int main(void)
   uint32_t duty2 = DUTY2;
   uint32_t nextStartTick2 = period2;
   uint32_t nextEndTick2 = period2;
+  cycleTimer timerLEDDebug = {1000, 5, &ledDebugSet, &ledDebugReset};
+
   printf("HalVersion= %lu; RevID= %lu; DevID= %lu\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID());
   while (1)
   {
@@ -97,19 +145,19 @@ int main(void)
     }
     if (HAL_GetTick() >= nextStartTick2)
     {
-      nextEndTick2 = nextStartTick2 + duty2*period2/100;
+      nextEndTick2 = nextStartTick2 + duty2 * period2 / 100;
       nextStartTick2 += period2;
-      HAL_GPIO_TogglePin(LED_DEBUG);
       HAL_GPIO_WritePin(BUZZER, GPIO_PIN_SET);
-      printf("SysTick= %lu; %s and %s toggled. next= %lu, fastCounter= %lu, \r\n", HAL_GetTick(), "LED_DEBUG", "BUZZER", nextEndTick2, fastCounter);
+      printf("SysTick= %lu; %s toggled. next= %lu, fastCounter= %lu, \r\n", HAL_GetTick(), "BUZZER", nextEndTick2, fastCounter);
     }
     if (HAL_GetTick() >= nextEndTick2)
     {
       nextEndTick2 += period2;
       HAL_GPIO_WritePin(BUZZER, GPIO_PIN_RESET);
     }
-      fastCounter++;
-    }
+    cycleTimer_execute(&timerLEDDebug);
+    fastCounter++;
+  }
 }
 
 void SysTick_Handler(void)
