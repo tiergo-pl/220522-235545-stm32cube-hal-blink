@@ -166,3 +166,6 @@ lib/USB_DEVICE/usbd_desc.c
 lib/USB_DEVICE/usbd_desc.h
 .vscode/tasks.json
 .pio/build/bluepill_f103c8_fake/idedata.json
+.pio/build/bluepill_f103c8_fake/src/pins.o
+__pycache__/swo_parser.cpython-39.pyc
+__pycache__/swo_parser.cpython-310.pyc

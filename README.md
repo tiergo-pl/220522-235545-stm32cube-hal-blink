@@ -1,0 +1,1 @@
+SWO parser from: https://github.com/maxgerhardt/pio-swo-demo
