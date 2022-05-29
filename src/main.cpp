@@ -21,9 +21,8 @@
 #endif
 
 #ifdef BLUEPILL_FAKE
-#define LED_PIN GPIO_PIN_13
-#define LED_GPIO_PORT GPIOC
-#define LED_GPIO_CLK_ENABLE() __HAL_RCC_GPIOC_CLK_ENABLE()
+#define LED_PC13 GPIOC, GPIO_PIN_13
+#define LED_PC13_MODE GPIO_MODE_OUTPUT_PP, GPIO_NOPULL, GPIO_SPEED_FREQ_LOW
 #define LED_DEBUG GPIOA, GPIO_PIN_12
 #define LED_DEBUG_MODE GPIO_MODE_OUTPUT_PP, GPIO_NOPULL, GPIO_SPEED_FREQ_MEDIUM
 #define BUZZER GPIOB, GPIO_PIN_5
@@ -42,12 +41,17 @@
 #include <stdio.h>
 #include "pins.h"
 
-void Error_Handler(void);
-void SystemClock_Config(void);
+extern "C" void Error_Handler(void);
+extern "C" void SystemClock_Config(void);
 uint32_t fastCounter = 0;
 uint32_t prevFastCounter = 0;
+/*
+extern "C" uint32_t HAL_GetTick()
+{
+  return HAL_GetTick();
+}*/
 
-int _write(int32_t file, uint8_t *ptr, int32_t len)
+extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
 {
   int i = 0;
   for (i = 0; i < len; i++)
@@ -69,10 +73,10 @@ void cycleTimer_execute(cycleTimer *timer)
 {
   if (HAL_GetTick() >= timer->start)
   {
-    //printf("timer->start= %lu, timer->period= %lu\t", timer->start, timer->period);
+    // printf("timer->start= %lu, timer->period= %lu\t", timer->start, timer->period);
     timer->end = timer->start + timer->duty * timer->period / 100;
     timer->start += timer->period;
-    //printf("timer->start= %lu, timer->end= %lu\r\n", timer->start, timer->end);
+    // printf("timer->start= %lu, timer->end= %lu\r\n", timer->start, timer->end);
 
     if (timer->funcStart != NULL)
     {
@@ -81,9 +85,9 @@ void cycleTimer_execute(cycleTimer *timer)
   }
   if (HAL_GetTick() >= timer->end)
   {
-    //printf("timer->end= %lu\t", timer->end);
+    // printf("timer->end= %lu\t", timer->end);
     timer->end += timer->period;
-    //printf("timer->end= %lu\r\n", timer->end);
+    // printf("timer->end= %lu\r\n", timer->end);
 
     if (timer->funcEnd != NULL)
     {
@@ -93,7 +97,7 @@ void cycleTimer_execute(cycleTimer *timer)
 }
 void ledPC13Toggle()
 {
-  HAL_GPIO_TogglePin(LED_GPIO_PORT, LED_PIN);
+  HAL_GPIO_TogglePin(LED_PC13);
   printf("SysTick= %lu; LED toggled. fastCounter= %lu, fastCounter cycles= %lu\r\n", HAL_GetTick(), fastCounter, fastCounter - prevFastCounter);
   prevFastCounter = fastCounter;
 }
@@ -109,41 +113,31 @@ void buzzerReset()
 void ledDebugSet()
 {
   HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_SET);
-  //printf("SysTick= %lu; LED_DEBUG HIGH\r\n", HAL_GetTick());
+  // printf("SysTick= %lu; LED_DEBUG HIGH\r\n", HAL_GetTick());
 }
 void ledDebugReset()
 {
   HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_RESET);
-  //printf("SysTick= %lu; LED_DEBUG LOW\r\n", HAL_GetTick());
+  // printf("SysTick= %lu; LED_DEBUG LOW\r\n", HAL_GetTick());
 }
 
 int main(void)
 {
-#ifdef BLUEPILL_FAKE
-  // SystemCoreClock = 8000000;
-#endif
   HAL_Init();
   SystemClock_Config();
+  printf("Debug: line number %u\r\n", __LINE__);
 
-  LED_GPIO_CLK_ENABLE();
-
-  GPIO_InitTypeDef GPIO_InitStruct;
-
-  GPIO_InitStruct.Pin = LED_PIN;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LED_GPIO_PORT, &GPIO_InitStruct);
-
+  pinSetup(LED_PC13, LED_PC13_MODE);
   pinSetup(LED_DEBUG, LED_DEBUG_MODE);
   pinSetup(BUZZER, BUZZER_MODE);
   // MX_USB_DEVICE_Init();
+  printf("Debug: line number %u\r\n", __LINE__);
 
   cycleTimer timerLEDPC13 = {PERIOD1, 50, &ledPC13Toggle};
   cycleTimer timerBuzzer = {PERIOD2, DUTY2, &buzzerSet, &buzzerReset};
   cycleTimer timerLEDDebug = {1000, 5, &ledDebugSet, &ledDebugReset, 200};
 
-  printf("HalVersion= %lu; RevID= %lu; DevID= %lu\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID());
+  printf("HalVersion= %lu; RevID= %lu; DevID= %lu; SystemCoreClock= %lu kHz\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID(), SystemCoreClock / 1000);
   while (1)
   {
 
@@ -154,7 +148,7 @@ int main(void)
   }
 }
 
-void SysTick_Handler(void)
+extern "C" void SysTick_Handler(void)
 {
   HAL_IncTick();
 }
