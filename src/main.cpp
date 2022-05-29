@@ -60,41 +60,48 @@ extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
   }
   return len;
 }
-typedef struct
+class CycleTimer
 {
+  private:
   uint32_t period;
   uint32_t duty;
   void (*funcStart)(void);
   void (*funcEnd)(void);
   uint32_t start;
   uint32_t end;
-} cycleTimer;
-void cycleTimer_execute(cycleTimer *timer)
-{
-  if (HAL_GetTick() >= timer->start)
+  public:
+  CycleTimer(uint32_t _period, uint32_t _duty, void (*funcS)() = nullptr, void (*funcE)() = nullptr, uint32_t _start = 0, uint32_t _end = 0) : period(_period), duty(_duty), funcStart(funcS), funcEnd(funcE), start(_start), end(_end)
   {
-    // printf("timer->start= %lu, timer->period= %lu\t", timer->start, timer->period);
-    timer->end = timer->start + timer->duty * timer->period / 100;
-    timer->start += timer->period;
-    // printf("timer->start= %lu, timer->end= %lu\r\n", timer->start, timer->end);
+    ;
+  }
+  void execute()
+  {
+  if (HAL_GetTick() >= start)
+  {
+    // printf("start= %lu, period= %lu\t", start, period);
+    end = start + duty * period / 100;
+    start += period;
+    // printf("start= %lu, end= %lu\r\n", start, end);
 
-    if (timer->funcStart != NULL)
+    if (funcStart != nullptr)
     {
-      timer->funcStart();
+      funcStart();
     }
   }
-  if (HAL_GetTick() >= timer->end)
+  if (HAL_GetTick() >= end)
   {
-    // printf("timer->end= %lu\t", timer->end);
-    timer->end += timer->period;
-    // printf("timer->end= %lu\r\n", timer->end);
+    // printf("end= %lu\t", end);
+    end += period;
+    // printf("end= %lu\r\n", end);
 
-    if (timer->funcEnd != NULL)
+    if (funcEnd != nullptr)
     {
-      timer->funcEnd();
+      funcEnd();
     }
   }
-}
+
+  }
+};
 void ledPC13Toggle()
 {
   HAL_GPIO_TogglePin(LED_PC13);
@@ -133,17 +140,17 @@ int main(void)
   // MX_USB_DEVICE_Init();
   printf("Debug: line number %u\r\n", __LINE__);
 
-  cycleTimer timerLEDPC13 = {PERIOD1, 50, &ledPC13Toggle};
-  cycleTimer timerBuzzer = {PERIOD2, DUTY2, &buzzerSet, &buzzerReset};
-  cycleTimer timerLEDDebug = {1000, 5, &ledDebugSet, &ledDebugReset, 200};
+  CycleTimer timerLEDPC13 = {PERIOD1, 50, &ledPC13Toggle};
+  CycleTimer timerBuzzer = {PERIOD2, DUTY2, &buzzerSet, &buzzerReset};
+  CycleTimer timerLEDDebug = {1000, 10, &ledDebugSet, &ledDebugReset, 400};
 
   printf("HalVersion= %lu; RevID= %lu; DevID= %lu; SystemCoreClock= %lu kHz\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID(), SystemCoreClock / 1000);
   while (1)
   {
 
-    cycleTimer_execute(&timerLEDPC13);
-    cycleTimer_execute(&timerBuzzer);
-    cycleTimer_execute(&timerLEDDebug);
+    timerLEDPC13.execute() ;
+    timerBuzzer.execute();
+    timerLEDDebug.execute();
     fastCounter++;
   }
 }
