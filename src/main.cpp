@@ -41,8 +41,8 @@
 #include <stdio.h>
 #include "pins.h"
 
-extern "C" void Error_Handler(void);
-extern "C" void SystemClock_Config(void);
+void Error_Handler(void);
+void SystemClock_Config(void);
 uint32_t fastCounter = 0;
 uint32_t prevFastCounter = 0;
 /*
