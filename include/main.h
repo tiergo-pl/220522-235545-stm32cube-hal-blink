@@ -1,3 +1,5 @@
+#pragma once
+
 #if F0
 #include "stm32f0xx_hal.h"
 #elif F1
