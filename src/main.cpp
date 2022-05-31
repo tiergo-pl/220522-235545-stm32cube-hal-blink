@@ -1,45 +1,8 @@
-#if F0
-#include "stm32f0xx_hal.h"
-#elif F1
-#include "stm32f1xx_hal.h"
-#elif F2
-#include "stm32f2xx_hal.h"
-#elif F3
-#include "stm32f3xx_hal.h"
-#elif F4
-#include "stm32f4xx_hal.h"
-#elif F7
-#include "stm32f7xx_hal.h"
-#elif L0
-#include "stm32l0xx_hal.h"
-#elif L1
-#include "stm32l1xx_hal.h"
-#elif L4
-#include "stm32l4xx_hal.h"
-#else
-#error "Unsupported STM32 Family"
-#endif
 
-#ifdef BLUEPILL_FAKE
-#define LED_PC13 GPIOC, GPIO_PIN_13
-#define LED_PC13_MODE GPIO_MODE_OUTPUT_PP, GPIO_NOPULL, GPIO_SPEED_FREQ_LOW
-#define LED_DEBUG GPIOA, GPIO_PIN_12
-#define LED_DEBUG_MODE GPIO_MODE_OUTPUT_PP, GPIO_NOPULL, GPIO_SPEED_FREQ_MEDIUM
-#define BUZZER GPIOB, GPIO_PIN_5
-#define BUZZER_MODE GPIO_MODE_OUTPUT_PP, GPIO_PULLUP, GPIO_SPEED_FREQ_MEDIUM
-
-#else
-#define LED_PIN GPIO_PIN_5
-#define LED_GPIO_PORT GPIOA
-#define LED_GPIO_CLK_ENABLE() __HAL_RCC_GPIOA_CLK_ENABLE()
-#endif
-#define PERIOD1 500
-#define PERIOD2 1000
-#define DUTY2 1
 
 //#include "usb_device.h"
-#include <stdio.h>
 #include "pins.h"
+#include "timers.h"
 
 // Global vars ----------------------------------------------------------
 void Error_Handler(void);
@@ -61,59 +24,10 @@ extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
   }
   return len;
 }
-class CycleTimer
-{
-private:
-  const uint32_t *tickSource;
-  uint32_t period;
-  uint32_t duty;
-  uint32_t start;
-  uint32_t end;
-  void (*funcStart)(void) = nullptr;
-  void (*funcEnd)(void) = nullptr;
-
-public:
-  CycleTimer(uint32_t *_tickSource, uint32_t _period, uint32_t _duty, uint32_t _start = 0, uint32_t _end = 0)
-      : tickSource(_tickSource), period(_period), duty(_duty), start(_start), end(_end)
-  {
-    ;
-  }
-  void registerCallbacks(void (*funcS)() = nullptr, void (*funcE)() = nullptr)
-  {
-    funcStart = funcS;
-    funcEnd = funcE;
-  }
-  void execute()
-  {
-    if (*tickSource >= start)
-    {
-      // printf("start= %lu, period= %lu\t", start, period);
-      end = start + duty * period / 100;
-      start += period;
-      // printf("start= %lu, end= %lu\r\n", start, end);
-
-      if (funcStart != nullptr)
-      {
-        funcStart();
-      }
-    }
-    if (*tickSource >= end)
-    {
-      // printf("end= %lu\t", end);
-      end += period;
-      // printf("end= %lu\r\n", end);
-
-      if (funcEnd != nullptr)
-      {
-        funcEnd();
-      }
-    }
-  }
-};
 void ledPC13Toggle()
 {
   HAL_GPIO_TogglePin(LED_PC13);
-  //   printf("SysTick= %lu; LED toggled. fastCounter= %lu, fastCounter cycles= %lu\r\n", HAL_GetTick(), fastCounter, fastCounter - prevFastCounter);
+  printf("SysTick= %lu; LED toggled. fastCounter= %lu, fastCounter cycles= %lu\r\n", HAL_GetTick(), fastCounter, fastCounter - prevFastCounter);
   prevFastCounter = fastCounter;
   //  printf("Debug: line number %u\r\n", __LINE__);
 }
@@ -155,11 +69,12 @@ int main(void)
   // MX_USB_DEVICE_Init();
   printf("Debug: line number %u\r\n", __LINE__);
 
-  CycleTimer timerLEDPC13 = {&tickWorkingCopy, PERIOD1, 50};
+  //uwTick = (uint32_t)(-4200); // Testing only!
+  CycleTimer timerLEDPC13 = {&tickWorkingCopy, PERIOD1, 50, uwTick};
   timerLEDPC13.registerCallbacks(&ledPC13Toggle);
-  CycleTimer timerBuzzer = {&tickWorkingCopy, PERIOD2, DUTY2};
+  CycleTimer timerBuzzer = {&tickWorkingCopy, PERIOD2, DUTY2, uwTick};
   timerBuzzer.registerCallbacks(&buzzerSet, &buzzerReset);
-  CycleTimer timerLEDDebug = {&tickWorkingCopy, 1000, 10, 400};
+  CycleTimer timerLEDDebug = {&tickWorkingCopy, 1000, 10, 400 + uwTick};
   timerLEDDebug.registerCallbacks(&ledDebugSet, &ledDebugReset);
 
   printf("HalVersion= %lu; RevID= %lu; DevID= %lu; SystemCoreClock= %lu kHz\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID(), SystemCoreClock / 1000);
