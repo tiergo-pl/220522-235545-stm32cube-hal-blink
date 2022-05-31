@@ -41,16 +41,17 @@
 #include <stdio.h>
 #include "pins.h"
 
+// Global vars ----------------------------------------------------------
 void Error_Handler(void);
 void SystemClock_Config(void);
 uint32_t fastCounter = 0;
 uint32_t prevFastCounter = 0;
-/*
-extern "C" uint32_t HAL_GetTick()
+uint32_t tickWorkingCopy;
+// ---------------------------------------------------------------------
+/*extern "C" uint32_t HAL_GetTick()
 {
   return HAL_GetTick();
 }*/
-
 extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
 {
   int i = 0;
@@ -62,72 +63,86 @@ extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
 }
 class CycleTimer
 {
-  private:
+private:
+  const uint32_t *tickSource;
   uint32_t period;
   uint32_t duty;
-  void (*funcStart)(void);
-  void (*funcEnd)(void);
   uint32_t start;
   uint32_t end;
-  public:
-  CycleTimer(uint32_t _period, uint32_t _duty, void (*funcS)() = nullptr, void (*funcE)() = nullptr, uint32_t _start = 0, uint32_t _end = 0) : period(_period), duty(_duty), funcStart(funcS), funcEnd(funcE), start(_start), end(_end)
+  void (*funcStart)(void) = nullptr;
+  void (*funcEnd)(void) = nullptr;
+
+public:
+  CycleTimer(uint32_t *_tickSource, uint32_t _period, uint32_t _duty, uint32_t _start = 0, uint32_t _end = 0)
+      : tickSource(_tickSource), period(_period), duty(_duty), start(_start), end(_end)
   {
     ;
   }
+  void registerCallbacks(void (*funcS)() = nullptr, void (*funcE)() = nullptr)
+  {
+    funcStart = funcS;
+    funcEnd = funcE;
+  }
   void execute()
   {
-  if (HAL_GetTick() >= start)
-  {
-    // printf("start= %lu, period= %lu\t", start, period);
-    end = start + duty * period / 100;
-    start += period;
-    // printf("start= %lu, end= %lu\r\n", start, end);
-
-    if (funcStart != nullptr)
+    if (*tickSource >= start)
     {
-      funcStart();
-    }
-  }
-  if (HAL_GetTick() >= end)
-  {
-    // printf("end= %lu\t", end);
-    end += period;
-    // printf("end= %lu\r\n", end);
+      // printf("start= %lu, period= %lu\t", start, period);
+      end = start + duty * period / 100;
+      start += period;
+      // printf("start= %lu, end= %lu\r\n", start, end);
 
-    if (funcEnd != nullptr)
+      if (funcStart != nullptr)
+      {
+        funcStart();
+      }
+    }
+    if (*tickSource >= end)
     {
-      funcEnd();
-    }
-  }
+      // printf("end= %lu\t", end);
+      end += period;
+      // printf("end= %lu\r\n", end);
 
+      if (funcEnd != nullptr)
+      {
+        funcEnd();
+      }
+    }
   }
 };
 void ledPC13Toggle()
 {
   HAL_GPIO_TogglePin(LED_PC13);
-  printf("SysTick= %lu; LED toggled. fastCounter= %lu, fastCounter cycles= %lu\r\n", HAL_GetTick(), fastCounter, fastCounter - prevFastCounter);
+  //   printf("SysTick= %lu; LED toggled. fastCounter= %lu, fastCounter cycles= %lu\r\n", HAL_GetTick(), fastCounter, fastCounter - prevFastCounter);
   prevFastCounter = fastCounter;
+  //  printf("Debug: line number %u\r\n", __LINE__);
 }
 void buzzerSet()
 {
   HAL_GPIO_WritePin(BUZZER, GPIO_PIN_SET);
+  //  printf("Debug: line number %u\r\n", __LINE__);
 }
 void buzzerReset()
 {
   HAL_GPIO_WritePin(BUZZER, GPIO_PIN_RESET);
+  //  printf("Debug: line number %u\r\n", __LINE__);
 }
 
 void ledDebugSet()
 {
   HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_SET);
+  // printf("Debug: line number %u\r\n", __LINE__);
+
   // printf("SysTick= %lu; LED_DEBUG HIGH\r\n", HAL_GetTick());
 }
 void ledDebugReset()
 {
   HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_RESET);
+  //  printf("Debug: line number %u\r\n", __LINE__);
+
   // printf("SysTick= %lu; LED_DEBUG LOW\r\n", HAL_GetTick());
 }
-
+// ***************************************************************************************************************************************************
 int main(void)
 {
   HAL_Init();
@@ -140,21 +155,24 @@ int main(void)
   // MX_USB_DEVICE_Init();
   printf("Debug: line number %u\r\n", __LINE__);
 
-  CycleTimer timerLEDPC13 = {PERIOD1, 50, &ledPC13Toggle};
-  CycleTimer timerBuzzer = {PERIOD2, DUTY2, &buzzerSet, &buzzerReset};
-  CycleTimer timerLEDDebug = {1000, 10, &ledDebugSet, &ledDebugReset, 400};
+  CycleTimer timerLEDPC13 = {&tickWorkingCopy, PERIOD1, 50};
+  timerLEDPC13.registerCallbacks(&ledPC13Toggle);
+  CycleTimer timerBuzzer = {&tickWorkingCopy, PERIOD2, DUTY2};
+  timerBuzzer.registerCallbacks(&buzzerSet, &buzzerReset);
+  CycleTimer timerLEDDebug = {&tickWorkingCopy, 1000, 10, 400};
+  timerLEDDebug.registerCallbacks(&ledDebugSet, &ledDebugReset);
 
   printf("HalVersion= %lu; RevID= %lu; DevID= %lu; SystemCoreClock= %lu kHz\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID(), SystemCoreClock / 1000);
   while (1)
   {
-
-    timerLEDPC13.execute() ;
+    tickWorkingCopy = HAL_GetTick();
+    timerLEDPC13.execute();
     timerBuzzer.execute();
     timerLEDDebug.execute();
     fastCounter++;
   }
 }
-
+// **************************************************************************************************************************************************************
 extern "C" void SysTick_Handler(void)
 {
   HAL_IncTick();
