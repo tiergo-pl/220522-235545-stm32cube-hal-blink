@@ -10,7 +10,7 @@ void Error_Handler(void);
 void SystemClock_Config(void);
 uint32_t fastCounter = 0;
 uint32_t prevFastCounter = 0;
-uint32_t tickWorkingCopy;
+int32_t tickWorkingCopy;
 // ---------------------------------------------------------------------
 /*extern "C" uint32_t HAL_GetTick()
 {
@@ -70,12 +70,13 @@ int main(void)
   // MX_USB_DEVICE_Init();
   printf("Debug: line number %u\r\n", __LINE__);
 
-  //uwTick = (uint32_t)(-4200); // Testing only!
-  CycleTimer timerLEDPC13 = {&tickWorkingCopy, PERIOD1, 50, uwTick};
+//  uwTick = (uint32_t)(-4200); // Testing only!
+//  uwTick = 0x0fffffff - 4200; // Testing only!
+  CycleTimer timerLEDPC13 = {&tickWorkingCopy, PERIOD1, 50, (int32_t)uwTick};
   timerLEDPC13.registerCallbacks(&ledPC13Toggle);
-  CycleTimer timerBuzzer = {&tickWorkingCopy, PERIOD2, DUTY2, uwTick};
+  CycleTimer timerBuzzer = {&tickWorkingCopy, PERIOD2, DUTY2, (int32_t)uwTick};
   timerBuzzer.registerCallbacks(&buzzerSet, &buzzerReset);
-  CycleTimer timerLEDDebug = {&tickWorkingCopy, 1000, 10, 400 + uwTick};
+  CycleTimer timerLEDDebug = {&tickWorkingCopy, 1000, 10, 400 + (int32_t)uwTick};
   timerLEDDebug.registerCallbacks(&ledDebugSet, &ledDebugReset);
 
   printf("HalVersion= %lu; RevID= %lu; DevID= %lu; SystemCoreClock= %lu kHz\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID(), SystemCoreClock / 1000);
