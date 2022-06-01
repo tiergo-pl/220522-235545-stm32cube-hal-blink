@@ -58,6 +58,8 @@ void ledDebugReset()
   // printf("SysTick= %lu; LED_DEBUG LOW\r\n", HAL_GetTick());
 }
 // ***************************************************************************************************************************************************
+CycleTimer timerLEDDebug(&tickWorkingCopy, 100, 10);
+
 int main(void)
 {
   HAL_Init();
@@ -70,14 +72,21 @@ int main(void)
   // MX_USB_DEVICE_Init();
   printf("Debug: line number %u\r\n", __LINE__);
 
-//  uwTick = (uint32_t)(-4200); // Testing only!
-//  uwTick = 0x0fffffff - 4200; // Testing only!
-  CycleTimer timerLEDPC13 = {&tickWorkingCopy, PERIOD1, 50, (int32_t)uwTick};
+  //  uwTick = (uint32_t)(-4200); // Testing only!
+  //  uwTick = 0x0fffffff - 4200; // Testing only!
+  CycleTimer timerLEDPC13(&tickWorkingCopy, PERIOD1, 50);
   timerLEDPC13.registerCallbacks(&ledPC13Toggle);
-  CycleTimer timerBuzzer = {&tickWorkingCopy, PERIOD2, DUTY2, (int32_t)uwTick};
+  CycleTimer timerBuzzer(&tickWorkingCopy, PERIOD2, DUTY2);
   timerBuzzer.registerCallbacks(&buzzerSet, &buzzerReset);
-  CycleTimer timerLEDDebug = {&tickWorkingCopy, 1000, 10, 400 + (int32_t)uwTick};
   timerLEDDebug.registerCallbacks(&ledDebugSet, &ledDebugReset);
+  CycleTimer timerBurst(&tickWorkingCopy, 2000, 50);
+  timerBurst.registerCallbacks([]()
+                               { timerLEDDebug.setPulses(5); });
+
+  timerLEDPC13.setPulses(TIMER_INFINITE, (int32_t)uwTick);
+  timerBuzzer.setPulses(TIMER_MONO, (int32_t)uwTick);
+  timerLEDDebug.setPulses(2);
+  timerBurst.setPulses(6, 5200 + (int32_t)uwTick);
 
   printf("HalVersion= %lu; RevID= %lu; DevID= %lu; SystemCoreClock= %lu kHz\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID(), SystemCoreClock / 1000);
   while (1)
@@ -86,7 +95,12 @@ int main(void)
     timerLEDPC13.execute();
     timerBuzzer.execute();
     timerLEDDebug.execute();
+    timerBurst.execute();
     fastCounter++;
+    if (tickWorkingCopy == 2000)
+    {
+      timerLEDDebug.setPulses(3);
+    }
   }
 }
 // **************************************************************************************************************************************************************
