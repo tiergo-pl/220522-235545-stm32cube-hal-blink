@@ -6,7 +6,7 @@ CycleTimer::CycleTimer(int32_t *_tickSource, uint32_t _period, uint32_t _duty)
   end = start + duty * period / 100;
 }
 
-void CycleTimer::registerCallbacks(void (*funcS)(), void (*funcE)())
+void CycleTimer::registerCallbacks(Callback funcS, Callback funcE)
 {
   funcStart = funcS;
   funcEnd = funcE;

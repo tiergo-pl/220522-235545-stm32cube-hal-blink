@@ -25,37 +25,22 @@ extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
   }
   return len;
 }
-void ledPC13Toggle()
-{
-  HAL_GPIO_TogglePin(LED_PC13);
-  printf("SysTick= %lu; LED toggled. fastCounter= %lu, fastCounter cycles= %lu\r\n", HAL_GetTick(), fastCounter, fastCounter - prevFastCounter);
-  prevFastCounter = fastCounter;
-  //  printf("Debug: line number %u\r\n", __LINE__);
-}
 void buzzerSet()
 {
   HAL_GPIO_WritePin(BUZZER, GPIO_PIN_SET);
-  //  printf("Debug: line number %u\r\n", __LINE__);
 }
 void buzzerReset()
 {
   HAL_GPIO_WritePin(BUZZER, GPIO_PIN_RESET);
-  //  printf("Debug: line number %u\r\n", __LINE__);
 }
 
 void ledDebugSet()
 {
   HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_SET);
-  // printf("Debug: line number %u\r\n", __LINE__);
-
-  // printf("SysTick= %lu; LED_DEBUG HIGH\r\n", HAL_GetTick());
 }
 void ledDebugReset()
 {
   HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_RESET);
-  //  printf("Debug: line number %u\r\n", __LINE__);
-
-  // printf("SysTick= %lu; LED_DEBUG LOW\r\n", HAL_GetTick());
 }
 // ***************************************************************************************************************************************************
 CycleTimer timerLEDDebug(&tickWorkingCopy, 100, 10);
@@ -75,13 +60,23 @@ int main(void)
   //  uwTick = (uint32_t)(-4200); // Testing only!
   //  uwTick = 0x0fffffff - 4200; // Testing only!
   CycleTimer timerLEDPC13(&tickWorkingCopy, PERIOD1, 50);
-  timerLEDPC13.registerCallbacks(&ledPC13Toggle);
+  timerLEDPC13.registerCallbacks([]()
+                                 {HAL_GPIO_TogglePin(LED_PC13);
+                                 printf("SysTick= %lu; LED toggled. fastCounter= %lu, fastCounter cycles= %lu\r\n", HAL_GetTick(), fastCounter, fastCounter - prevFastCounter);
+                                 prevFastCounter = fastCounter; });
   CycleTimer timerBuzzer(&tickWorkingCopy, PERIOD2, DUTY2);
-  timerBuzzer.registerCallbacks(&buzzerSet, &buzzerReset);
-  timerLEDDebug.registerCallbacks(&ledDebugSet, &ledDebugReset);
+  timerBuzzer.registerCallbacks([]()
+                                { HAL_GPIO_WritePin(BUZZER, GPIO_PIN_SET); },
+                                []()
+                                { HAL_GPIO_WritePin(BUZZER, GPIO_PIN_RESET); });
+  timerLEDDebug.registerCallbacks([]()
+                                  { HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_SET); },
+                                  []()
+                                  { HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_RESET); });
   CycleTimer timerBurst(&tickWorkingCopy, 2000, 50);
-  timerBurst.registerCallbacks([]()
-                               { timerLEDDebug.setPulses(5); });
+  int pulses = 5;
+  timerBurst.registerCallbacks([&]()
+                               { timerLEDDebug.setPulses(pulses); }); // takes also local variable
 
   timerLEDPC13.setPulses(TIMER_INFINITE, (int32_t)uwTick);
   timerBuzzer.setPulses(TIMER_MONO, (int32_t)uwTick);
