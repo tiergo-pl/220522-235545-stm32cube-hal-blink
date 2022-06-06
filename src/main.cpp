@@ -25,25 +25,7 @@ extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
   }
   return len;
 }
-void buzzerSet()
-{
-  HAL_GPIO_WritePin(BUZZER, GPIO_PIN_SET);
-}
-void buzzerReset()
-{
-  HAL_GPIO_WritePin(BUZZER, GPIO_PIN_RESET);
-}
-
-void ledDebugSet()
-{
-  HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_SET);
-}
-void ledDebugReset()
-{
-  HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_RESET);
-}
 // ***************************************************************************************************************************************************
-CycleTimer timerLEDDebug(&tickWorkingCopy, 100, 10);
 
 int main(void)
 {
@@ -54,34 +36,56 @@ int main(void)
   pinSetup(LED_PC13, LED_PC13_MODE);
   pinSetup(LED_DEBUG, LED_DEBUG_MODE);
   pinSetup(BUZZER, BUZZER_MODE);
+  pinSetup(BUTTON_LEFT, BUTTON_LEFT_MODE);
+  pinSetup(BUTTON_RIGHT, BUTTON_RIGHT_MODE);
   // MX_USB_DEVICE_Init();
   printf("Debug: line number %u\r\n", __LINE__);
 
   //  uwTick = (uint32_t)(-4200); // Testing only!
   //  uwTick = 0x0fffffff - 4200; // Testing only!
-  CycleTimer timerLEDPC13(&tickWorkingCopy, PERIOD1, 50);
+  CycleTimer timerLEDPC13(&tickWorkingCopy, PERIOD1);
   timerLEDPC13.registerCallbacks([]()
                                  {HAL_GPIO_TogglePin(LED_PC13);
-                                 printf("SysTick= %lu; LED toggled. fastCounter= %lu, fastCounter cycles= %lu\r\n", HAL_GetTick(), fastCounter, fastCounter - prevFastCounter);
+                                 //printf("SysTick= %lu; LED toggled. fastCounter= %lu, fastCounter cycles= %lu\r\n", HAL_GetTick(), fastCounter, fastCounter - prevFastCounter);
                                  prevFastCounter = fastCounter; });
   CycleTimer timerBuzzer(&tickWorkingCopy, PERIOD2, DUTY2);
   timerBuzzer.registerCallbacks([]()
                                 { HAL_GPIO_WritePin(BUZZER, GPIO_PIN_SET); },
                                 []()
                                 { HAL_GPIO_WritePin(BUZZER, GPIO_PIN_RESET); });
+  CycleTimer timerLEDDebug(&tickWorkingCopy, 100, 10);
   timerLEDDebug.registerCallbacks([]()
                                   { HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_SET); },
                                   []()
                                   { HAL_GPIO_WritePin(LED_DEBUG, GPIO_PIN_RESET); });
-  CycleTimer timerBurst(&tickWorkingCopy, 2000, 50);
+  CycleTimer timerBurst(&tickWorkingCopy, 10000);
   int pulses = 5;
   timerBurst.registerCallbacks([&]()
                                { timerLEDDebug.setPulses(pulses); }); // takes also local variable
+  Key buttonLeft(BUTTON_LEFT);
+  Key buttonRight(BUTTON_RIGHT);
+  buttonLeft.setFunction([&]()
+                         { timerBuzzer.setPulses(2); },
+                         [&]()
+                         { printf("L_B++\r\n"); },
+                         [&]()
+                         { printf("Left Button - Long pressed\r\n"); });
+  buttonRight.setFunction([&]()
+                          { timerLEDDebug.setPulses(3); },
+                          [&]()
+                          { printf("R_B++\r\n"); },
+                          [&]()
+                          { printf("Right Button - Long pressed\r\n"); });
 
+  CycleTimer keyRefresh(&tickWorkingCopy, KEY_REFRESH_RATE);
+  keyRefresh.registerCallbacks([&]()
+                               { buttonLeft.read();
+                               buttonRight.read(); });
   timerLEDPC13.setPulses(TIMER_INFINITE, (int32_t)uwTick);
   timerBuzzer.setPulses(TIMER_MONO, (int32_t)uwTick);
-  timerLEDDebug.setPulses(2);
-  timerBurst.setPulses(6, 5200 + (int32_t)uwTick);
+  timerLEDDebug.setPulses(3);
+  timerBurst.setPulses(TIMER_INFINITE, (int32_t)uwTick + 10000);
+  keyRefresh.setPulses(TIMER_INFINITE, (int32_t)uwTick);
 
   printf("HalVersion= %lu; RevID= %lu; DevID= %lu; SystemCoreClock= %lu kHz\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID(), SystemCoreClock / 1000);
   while (1)
@@ -91,11 +95,9 @@ int main(void)
     timerBuzzer.execute();
     timerLEDDebug.execute();
     timerBurst.execute();
+    keyRefresh.execute();
+
     fastCounter++;
-    if (tickWorkingCopy == 2000)
-    {
-      timerLEDDebug.setPulses(3);
-    }
   }
 }
 // **************************************************************************************************************************************************************

@@ -21,3 +21,60 @@ void pinSetup(GPIO_TypeDef *port, uint32_t pin, uint32_t mode, uint32_t pull, ui
   GPIO_InitStruct.Speed = speed;
   HAL_GPIO_Init(port, &GPIO_InitStruct);
 }
+
+Key::Key(GPIO_TypeDef *_port, uint16_t _pin) : port(_port), pin(_pin)
+{
+}
+void Key::setFunction(Callback _shortPressFunc, Callback _longPressingFunc, Callback _longPressFunc)
+{
+  shortPressFunc = _shortPressFunc;
+  longPressingFunc = _longPressingFunc;
+  longPressFunc = _longPressFunc;
+}
+void Key::read()
+{
+  if (HAL_GPIO_ReadPin(port, pin) == KEY_PRESSED)
+  {
+    switch (buttonState)
+    {
+    case NotPressed:
+        buttonState = Debounce;
+      break;
+    case Debounce:
+      buttonState = ShortPressed;
+      break;
+    case ShortPressed:
+    case LongPressed:
+      if (pressedTime > 20) // change to relative value
+      {
+        buttonState = LongPressed;
+        if (longPressingFunc != nullptr)
+          longPressingFunc();
+      }
+      break;
+
+    default:
+      break;
+    }
+    pressedTime++;
+  }
+  else
+  {
+    switch (buttonState)
+    {
+    case ShortPressed:
+      if (shortPressFunc != nullptr)
+        shortPressFunc();
+      break;
+    case LongPressed:
+      if (longPressFunc != nullptr)
+        longPressFunc();
+      break;
+    default:
+      break;
+    }
+
+    buttonState = NotPressed;
+    pressedTime = 0;
+  }
+}

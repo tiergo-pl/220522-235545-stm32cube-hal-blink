@@ -18,10 +18,10 @@ void CycleTimer::execute()
   {
     if (*tickSource - start >= 0)
     {
-      printf("hex SysTick= %lx; start= %lu, period= %lu\t", *tickSource, start, period);
+      //printf("hex SysTick= %lx; start= %lu, period= %lu\t", *tickSource, start, period);
       end = start + duty * period / 100;
       start += period;
-      printf("start= %lu, end= %lu\r\n", start, end);
+      //printf("start= %lu, end= %lu\r\n", start, end);
 
       if (funcStart != nullptr)
       {
@@ -30,9 +30,9 @@ void CycleTimer::execute()
     }
     if (*tickSource - end >= 0)
     {
-      printf("hex SysTick= %lx; end= %lu\t", *tickSource, end);
+      //printf("hex SysTick= %lx; end= %lu\t", *tickSource, end);
       end += period;
-      printf("end= %lu\r\n", end);
+      //printf("end= %lu\r\n", end);
 
       if (funcEnd != nullptr)
       {

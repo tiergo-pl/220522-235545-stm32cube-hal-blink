@@ -36,14 +36,15 @@
 #define BUTTON_LEFT_MODE GPIO_MODE_INPUT, GPIO_PULLUP, GPIO_SPEED_FREQ_MEDIUM
 #define BUTTON_RIGHT GPIOB, GPIO_PIN_13
 #define BUTTON_RIGHT_MODE GPIO_MODE_INPUT, GPIO_PULLUP, GPIO_SPEED_FREQ_MEDIUM
-
+#define KEY_PRESSED 0 //0 if button shorts to GND with pin pulled up to V+ 
 #else
 #define LED_PIN GPIO_PIN_5
 #define LED_GPIO_PORT GPIOA
 #define LED_GPIO_CLK_ENABLE() __HAL_RCC_GPIOA_CLK_ENABLE()
 #endif
 #define PERIOD1 500
-#define PERIOD2 1000
-#define DUTY2 1
+#define PERIOD2 100
+#define DUTY2 10
+#define KEY_REFRESH_RATE 40 //in SysTicks (mSecs)
 
 using Callback = std::function<void()>;
