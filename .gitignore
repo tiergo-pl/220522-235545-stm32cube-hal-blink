@@ -170,3 +170,5 @@ lib/USB_DEVICE/usbd_desc.h
 .pio/build/bluepill_f103c8_fake/src/pins.o
 __pycache__/swo_parser.cpython-39.pyc
 __pycache__/swo_parser.cpython-310.pyc
+.pio/build/bluepill_f103c8_fake/src/stm32f1xx_hal_msp.o
+.pio/build/bluepill_f103c8_fake/src/stm32f1xx_it.o
