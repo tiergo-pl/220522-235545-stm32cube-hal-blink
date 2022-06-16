@@ -6,19 +6,20 @@
 #include "timers.h"
 
 // Global vars ----------------------------------------------------------
+UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
+
+char uart2RxData;
+uint8_t lineFeed = 0;
+char uart3RxData;
 
 uint32_t fastCounter = 0;
 uint32_t prevFastCounter = 0;
 int32_t tickWorkingCopy;
 // ---------------------------------------------------------------------
 void SystemClock_Config(void);
-static void MX_USART3_UART_Init(void);
-
-/*extern "C" uint32_t HAL_GetTick()
-{
-  return HAL_GetTick();
-}*/
+static void MX_USART3_UART_Init(uint32_t baudRate);
+static void MX_USART2_UART_Init(void);
 
 // Set SWO pin to sending printf texts
 extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
@@ -32,13 +33,12 @@ extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
 }
 // ***************************************************************************************************************************************************
 
-char uartRxData;
-
 int main(void)
 {
   HAL_Init();
   SystemClock_Config();
-  MX_USART3_UART_Init();
+  MX_USART3_UART_Init(115200);
+  MX_USART2_UART_Init();
 
   printf("Debug: line number %u\r\n", __LINE__);
 
@@ -46,7 +46,9 @@ int main(void)
   uint16_t uartTxSize = 0;
   static uint16_t uartCounter = 0;
 
-  HAL_UART_Receive_IT(&huart3, (uint8_t *)&uartRxData, 1);
+  HAL_UART_Receive_IT(&huart2, (uint8_t *)&uart2RxData, 1);
+  //HAL_HalfDuplex_EnableReceiver(&huart3);
+  HAL_UART_Receive_IT(&huart3, (uint8_t *)&uart3RxData, 1);
 
   pinSetup(LED_PC13, LED_PC13_MODE);
   pinSetup(LED_DEBUG, LED_DEBUG_MODE);
@@ -62,8 +64,7 @@ int main(void)
   timerLEDPC13.registerCallbacks([&]()
                                  {HAL_GPIO_TogglePin(LED_PC13);
                                  //printf("SysTick= %lu; LED toggled. fastCounter= %lu, fastCounter cycles= %lu\r\n", HAL_GetTick(), fastCounter, fastCounter - prevFastCounter);
-                                 prevFastCounter = fastCounter;
-                                 printf("Received: %c\r\n",uartRxData); });
+                                 prevFastCounter = fastCounter; });
   CycleTimer timerBuzzer(&tickWorkingCopy, PERIOD2, DUTY2);
   timerBuzzer.registerCallbacks([]()
                                 { HAL_GPIO_WritePin(BUZZER, GPIO_PIN_SET); },
@@ -87,15 +88,20 @@ int main(void)
                          [&]()
                          { printf("Left Button - Long pressed, TX:%d\r\n",uartCounter);
                          uartCounter++;
-                         uartTxSize = sprintf(uartTxData, "UART TX test. Number of sent messages: %d.\n\r", uartCounter);
+                         uartTxSize = sprintf(uartTxData, "UART TX test. Number of sent messages: %d.\r\n", uartCounter);
                          printf(uartTxData);
-                         HAL_UART_Transmit_IT(&huart3, (uint8_t *)uartTxData, uartTxSize); });
+                         HAL_UART_Transmit_IT(&huart2, (uint8_t *)uartTxData, uartTxSize); });
   buttonRight.setFunction([&]()
                           { timerLEDDebug.setPulses(3); },
                           [&]()
                           { printf("R_B++\r\n"); },
                           [&]()
-                          { printf("Right Button - Long pressed\r\n"); });
+                          { printf("Right Button - Long pressed\r\n");
+                            uartTxSize = sprintf(uartTxData, "UART3 TX test. SysTick: %lu.\r\n", HAL_GetTick());
+                            //HAL_HalfDuplex_EnableTransmitter(&huart3);
+                            HAL_UART_Transmit_IT(&huart3, (uint8_t *)uartTxData, uartTxSize);
+                            //HAL_HalfDuplex_EnableReceiver(&huart3);
+                            });
 
   CycleTimer keyRefresh(&tickWorkingCopy, KEY_REFRESH_RATE);
   keyRefresh.registerCallbacks([&]()
@@ -117,6 +123,13 @@ int main(void)
     timerBurst.execute();
     keyRefresh.execute();
 
+    if (lineFeed == 0x0a && __HAL_UART_GET_FLAG(&huart2, UART_FLAG_TC) == SET)
+    {
+      // uartTxData[0]= '\n';
+      // HAL_UART_Transmit_IT(&huart2, (uint8_t *)uartTxData, 1);
+      HAL_UART_Transmit_IT(&huart2, &lineFeed, 1);
+      lineFeed = 0;
+    }
     fastCounter++;
   }
 }
@@ -172,7 +185,44 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-static void MX_USART3_UART_Init(void)
+/**
+ * @brief USART2 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+}
+
+/**
+ * @brief USART3 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_USART3_UART_Init(uint32_t baudRate)
 {
 
   /* USER CODE BEGIN USART3_Init 0 */
@@ -183,14 +233,14 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 115200;
+  huart3.Init.BaudRate = baudRate;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
   huart3.Init.Mode = UART_MODE_TX_RX;
   huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart3.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart3) != HAL_OK)
+  if (HAL_HalfDuplex_Init(&huart3) != HAL_OK)
   {
     Error_Handler();
   }
@@ -198,16 +248,22 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 2 */
 }
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-  if (huart == &huart3)
+  if (huart == &huart2)
   { // echo port
-    if (uartRxData == 0x0d)
+    HAL_UART_Transmit_IT(huart, (uint8_t *)&uart2RxData, 1);
+    printf("Uart2 received: %c\r\n", uart2RxData);
+    if (uart2RxData == 0x0d)
     {
-      uint8_t lineFeed = 0x0a;
-      HAL_UART_Transmit_IT(huart, &lineFeed, 1);
+      lineFeed = 0x0a;
     }
-    HAL_UART_Transmit_IT(huart, (uint8_t *)&uartRxData, 1);
-    HAL_UART_Receive_IT(huart, (uint8_t *)&uartRxData, 1); // Ponowne włączenie nasłuchiwania
+    HAL_UART_Receive_IT(huart, (uint8_t *)&uart2RxData, 1); // Turn on receiving again
+  }
+  if (huart == &huart3)
+  { // forward to SWO
+    printf("Uart3 received: %c\r\n",uart3RxData);
+    HAL_UART_Receive_IT(huart, (uint8_t *)&uart3RxData, 1); // Turn on receiving again
   }
 }
