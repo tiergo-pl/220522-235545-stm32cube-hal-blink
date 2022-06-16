@@ -19,6 +19,8 @@ static void MX_USART3_UART_Init(void);
 {
   return HAL_GetTick();
 }*/
+
+// Set SWO pin to sending printf texts
 extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
 {
   int i = 0;
@@ -29,6 +31,8 @@ extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
   return len;
 }
 // ***************************************************************************************************************************************************
+
+char uartRxData;
 
 int main(void)
 {
@@ -42,6 +46,8 @@ int main(void)
   uint16_t uartTxSize = 0;
   static uint16_t uartCounter = 0;
 
+  HAL_UART_Receive_IT(&huart3, (uint8_t *)&uartRxData, 1);
+
   pinSetup(LED_PC13, LED_PC13_MODE);
   pinSetup(LED_DEBUG, LED_DEBUG_MODE);
   pinSetup(BUZZER, BUZZER_MODE);
@@ -53,10 +59,11 @@ int main(void)
   //  uwTick = (uint32_t)(-4200); // Testing only!
   //  uwTick = 0x0fffffff - 4200; // Testing only!
   CycleTimer timerLEDPC13(&tickWorkingCopy, PERIOD1);
-  timerLEDPC13.registerCallbacks([]()
+  timerLEDPC13.registerCallbacks([&]()
                                  {HAL_GPIO_TogglePin(LED_PC13);
                                  //printf("SysTick= %lu; LED toggled. fastCounter= %lu, fastCounter cycles= %lu\r\n", HAL_GetTick(), fastCounter, fastCounter - prevFastCounter);
-                                 prevFastCounter = fastCounter; });
+                                 prevFastCounter = fastCounter;
+                                 printf("Received: %c\r\n",uartRxData); });
   CycleTimer timerBuzzer(&tickWorkingCopy, PERIOD2, DUTY2);
   timerBuzzer.registerCallbacks([]()
                                 { HAL_GPIO_WritePin(BUZZER, GPIO_PIN_SET); },
@@ -80,7 +87,7 @@ int main(void)
                          [&]()
                          { printf("Left Button - Long pressed, TX:%d\r\n",uartCounter);
                          uartCounter++;
-                         uartTxSize = sprintf(uartTxData, "Liczba wyslanych wiadomosci: %d.\n\r", uartCounter);
+                         uartTxSize = sprintf(uartTxData, "UART TX test. Number of sent messages: %d.\n\r", uartCounter);
                          printf(uartTxData);
                          HAL_UART_Transmit_IT(&huart3, (uint8_t *)uartTxData, uartTxSize); });
   buttonRight.setFunction([&]()
@@ -190,4 +197,17 @@ static void MX_USART3_UART_Init(void)
   /* USER CODE BEGIN USART3_Init 2 */
 
   /* USER CODE END USART3_Init 2 */
+}
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart == &huart3)
+  { // echo port
+    if (uartRxData == 0x0d)
+    {
+      uint8_t lineFeed = 0x0a;
+      HAL_UART_Transmit_IT(huart, &lineFeed, 1);
+    }
+    HAL_UART_Transmit_IT(huart, (uint8_t *)&uartRxData, 1);
+    HAL_UART_Receive_IT(huart, (uint8_t *)&uartRxData, 1); // Ponowne włączenie nasłuchiwania
+  }
 }
