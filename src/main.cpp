@@ -4,6 +4,12 @@
 #include "main.h"
 #include "pins.h"
 #include "timers.h"
+#include "OneWire.h"
+
+// Testing purposes only====================================================
+#define CHECK_SIZE_LEN 1000
+volatile int64_t checkSize[CHECK_SIZE_LEN];
+//===============================================
 
 // Global vars ----------------------------------------------------------
 UART_HandleTypeDef huart2;
@@ -17,9 +23,6 @@ uint32_t fastCounter = 0;
 uint32_t prevFastCounter = 0;
 int32_t tickWorkingCopy;
 // ---------------------------------------------------------------------
-void SystemClock_Config(void);
-static void MX_USART3_UART_Init(uint32_t baudRate);
-static void MX_USART2_UART_Init(void);
 
 // Set SWO pin to sending printf texts
 extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
@@ -35,6 +38,15 @@ extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
 
 int main(void)
 {
+
+  // Testing purposes only====================================================
+  for (int i = 0; i < CHECK_SIZE_LEN; i++)
+  {
+    checkSize[i] = 0;
+  }
+
+  //===============================================
+
   HAL_Init();
   SystemClock_Config();
   MX_USART3_UART_Init(115200);
@@ -47,8 +59,8 @@ int main(void)
   static uint16_t uartCounter = 0;
 
   HAL_UART_Receive_IT(&huart2, (uint8_t *)&uart2RxData, 1);
-  //HAL_HalfDuplex_EnableReceiver(&huart3);
-  HAL_UART_Receive_IT(&huart3, (uint8_t *)&uart3RxData, 1);
+  // HAL_HalfDuplex_EnableReceiver(&huart3);
+  // HAL_UART_Receive_IT(&huart3, (uint8_t *)&uart3RxData, 1);
 
   pinSetup(LED_PC13, LED_PC13_MODE);
   pinSetup(LED_DEBUG, LED_DEBUG_MODE);
@@ -96,12 +108,13 @@ int main(void)
                           [&]()
                           { printf("R_B++\r\n"); },
                           [&]()
-                          { printf("Right Button - Long pressed\r\n");
+                          {
+                            printf("Right Button - Long pressed\r\n");
                             uartTxSize = sprintf(uartTxData, "UART3 TX test. SysTick: %lu.\r\n", HAL_GetTick());
-                            //HAL_HalfDuplex_EnableTransmitter(&huart3);
+                            // HAL_HalfDuplex_EnableTransmitter(&huart3);
                             HAL_UART_Transmit_IT(&huart3, (uint8_t *)uartTxData, uartTxSize);
-                            //HAL_HalfDuplex_EnableReceiver(&huart3);
-                            });
+                            // HAL_HalfDuplex_EnableReceiver(&huart3);
+                          });
 
   CycleTimer keyRefresh(&tickWorkingCopy, KEY_REFRESH_RATE);
   keyRefresh.registerCallbacks([&]()
@@ -190,7 +203,7 @@ void Error_Handler(void)
  * @param None
  * @retval None
  */
-static void MX_USART2_UART_Init(void)
+void MX_USART2_UART_Init(void)
 {
 
   /* USER CODE BEGIN USART2_Init 0 */
@@ -222,7 +235,7 @@ static void MX_USART2_UART_Init(void)
  * @param None
  * @retval None
  */
-static void MX_USART3_UART_Init(uint32_t baudRate)
+void MX_USART3_UART_Init(uint32_t baudRate)
 {
 
   /* USER CODE BEGIN USART3_Init 0 */
@@ -263,7 +276,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   }
   if (huart == &huart3)
   { // forward to SWO
-    printf("Uart3 received: %c\r\n",uart3RxData);
+    printf("Uart3 received: %c\r\n", uart3RxData);
     HAL_UART_Receive_IT(huart, (uint8_t *)&uart3RxData, 1); // Turn on receiving again
   }
 }

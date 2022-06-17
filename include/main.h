@@ -47,6 +47,22 @@
 #define DUTY2 10
 #define KEY_REFRESH_RATE 40 //in SysTicks (mSecs)
 
+// Global vars ----------------------------------------------------------
+extern UART_HandleTypeDef huart2;
+extern UART_HandleTypeDef huart3;
+
+extern char uart2RxData;
+extern uint8_t lineFeed;
+extern char uart3RxData;
+
+extern uint32_t fastCounter;
+extern uint32_t prevFastCounter;
+extern int32_t tickWorkingCopy;
+// ---------------------------------------------------------------------
+void SystemClock_Config(void);
+void MX_USART3_UART_Init(uint32_t baudRate);
+void MX_USART2_UART_Init(void);
+
 void Error_Handler(void);
 
 using Callback = std::function<void()>;
