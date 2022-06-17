@@ -45,7 +45,7 @@ void Key::read()
       break;
     case ShortPressed:
     case LongPressed:
-      if (pressedTime > 20) // change to relative value
+      if (pressedTime > LONG_PRESS_DURATION/KEY_REFRESH_RATE) // change to relative value
       {
         buttonState = LongPressed;
         if (longPressingFunc != nullptr)

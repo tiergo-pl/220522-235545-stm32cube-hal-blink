@@ -7,13 +7,14 @@
 #include "OneWire.h"
 
 // Testing purposes only====================================================
-#define CHECK_SIZE_LEN 1000
+#define CHECK_SIZE_LEN 8
 volatile int64_t checkSize[CHECK_SIZE_LEN];
 //===============================================
 
 // Global vars ----------------------------------------------------------
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
+//OneWire oneWireUART3(&huart3,USART3,115200);
 
 char uart2RxData;
 uint8_t lineFeed = 0;
@@ -49,7 +50,7 @@ int main(void)
 
   HAL_Init();
   SystemClock_Config();
-  MX_USART3_UART_Init(115200);
+  MX_USART3_UART_Init();
   MX_USART2_UART_Init();
 
   printf("Debug: line number %u\r\n", __LINE__);
@@ -59,7 +60,6 @@ int main(void)
   static uint16_t uartCounter = 0;
 
   HAL_UART_Receive_IT(&huart2, (uint8_t *)&uart2RxData, 1);
-  // HAL_HalfDuplex_EnableReceiver(&huart3);
   HAL_UART_Receive_IT(&huart3, (uint8_t *)&uart3RxData, 1);
 
   pinSetup(LED_PC13, LED_PC13_MODE);
@@ -111,9 +111,7 @@ int main(void)
                           {
                             printf("Right Button - Long pressed\r\n");
                             uartTxSize = sprintf(uartTxData, "UART3 TX test. SysTick: %lu.\r\n", HAL_GetTick());
-                            // HAL_HalfDuplex_EnableTransmitter(&huart3);
                             HAL_UART_Transmit_IT(&huart3, (uint8_t *)uartTxData, uartTxSize);
-                            // HAL_HalfDuplex_EnableReceiver(&huart3);
                           });
 
   CycleTimer keyRefresh(&tickWorkingCopy, KEY_REFRESH_RATE);
@@ -138,8 +136,6 @@ int main(void)
 
     if (lineFeed == 0x0a && __HAL_UART_GET_FLAG(&huart2, UART_FLAG_TC) == SET)
     {
-      // uartTxData[0]= '\n';
-      // HAL_UART_Transmit_IT(&huart2, (uint8_t *)uartTxData, 1);
       HAL_UART_Transmit_IT(&huart2, &lineFeed, 1);
       lineFeed = 0;
     }
@@ -193,6 +189,7 @@ void Error_Handler(void)
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
+  printf("Something went WRONG!!!!!! - Error Handler.");
   while (1)
   {
   }
@@ -229,13 +226,7 @@ void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 2 */
 }
-
-/**
- * @brief USART3 Initialization Function
- * @param None
- * @retval None
- */
-void MX_USART3_UART_Init(uint32_t baudRate)
+void MX_USART3_UART_Init(void)
 {
 
   /* USER CODE BEGIN USART3_Init 0 */
@@ -246,7 +237,7 @@ void MX_USART3_UART_Init(uint32_t baudRate)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = baudRate;
+  huart3.Init.BaudRate = 115200;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;

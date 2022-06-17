@@ -45,7 +45,8 @@
 #define PERIOD1 500
 #define PERIOD2 100
 #define DUTY2 10
-#define KEY_REFRESH_RATE 40 //in SysTicks (mSecs)
+#define KEY_REFRESH_RATE 40 //in SysTicks (usually mSecs)
+#define LONG_PRESS_DURATION 500 //in SysTicks (usually mSecs)
 
 // Global vars ----------------------------------------------------------
 extern UART_HandleTypeDef huart2;
@@ -60,9 +61,8 @@ extern uint32_t prevFastCounter;
 extern int32_t tickWorkingCopy;
 // ---------------------------------------------------------------------
 void SystemClock_Config(void);
-void MX_USART3_UART_Init(uint32_t baudRate);
 void MX_USART2_UART_Init(void);
-
+void MX_USART3_UART_Init(void);
 void Error_Handler(void);
 
 using Callback = std::function<void()>;
