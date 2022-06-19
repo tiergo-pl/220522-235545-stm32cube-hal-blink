@@ -6,26 +6,29 @@
 #include "timers.h"
 #include "OneWire.h"
 
+/*
 // Testing purposes only====================================================
 #define CHECK_SIZE_LEN 8
 volatile int64_t checkSize[CHECK_SIZE_LEN];
 //===============================================
+*/
 
 // Global vars ----------------------------------------------------------
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
-//OneWire oneWireUART3(&huart3,USART3,115200);
+OneWire oneWireUART3(&tickWorkingCopy, &huart3, USART3);
 
 char uart2RxData;
 uint8_t lineFeed = 0;
-char uart3RxData;
+char uart3RxData[256];
 
 uint32_t fastCounter = 0;
 uint32_t prevFastCounter = 0;
-int32_t tickWorkingCopy;
+int32_t tickWorkingCopy; // signed int to provide correct time calculation during counter overflow
+
 // ---------------------------------------------------------------------
 
-// Set SWO pin to sending printf texts
+// Set SWO pin to sendingLOG_SWO texts
 extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
 {
   int i = 0;
@@ -35,32 +38,35 @@ extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
   }
   return len;
 }
-// ***************************************************************************************************************************************************
-
+// ****************************************************************************************************************************
+// ****************************************************************************************************************************
 int main(void)
 {
+  /*
+    // Testing purposes only====================================================
+    for (int i = 0; i < CHECK_SIZE_LEN; i++)
+    {
+      checkSize[i] = 0;
+    }
 
-  // Testing purposes only====================================================
-  for (int i = 0; i < CHECK_SIZE_LEN; i++)
-  {
-    checkSize[i] = 0;
-  }
-
-  //===============================================
+    //===============================================
+  */
 
   HAL_Init();
   SystemClock_Config();
-  MX_USART3_UART_Init();
+  // MX_USART3_UART_Init();
+  oneWireUART3.uartInit();
+  // uart3RxData[1] = '\0'; // c-string null end
   MX_USART2_UART_Init();
 
-  printf("Debug: line number %u\r\n", __LINE__);
+  LOG_SWO("Debug: line number %u\r\n", __LINE__);
 
   char uartTxData[128];
   uint16_t uartTxSize = 0;
   static uint16_t uartCounter = 0;
 
   HAL_UART_Receive_IT(&huart2, (uint8_t *)&uart2RxData, 1);
-  HAL_UART_Receive_IT(&huart3, (uint8_t *)&uart3RxData, 1);
+  // HAL_UART_Receive_IT(&huart3, (uint8_t *)uart3RxData, 1);
 
   pinSetup(LED_PC13, LED_PC13_MODE);
   pinSetup(LED_DEBUG, LED_DEBUG_MODE);
@@ -68,7 +74,7 @@ int main(void)
   pinSetup(BUTTON_LEFT, BUTTON_LEFT_MODE);
   pinSetup(BUTTON_RIGHT, BUTTON_RIGHT_MODE);
   // MX_USB_DEVICE_Init();
-  printf("Debug: line number %u\r\n", __LINE__);
+  LOG_SWO("Debug: line number %u\r\n", __LINE__);
 
   //  uwTick = (uint32_t)(-4200); // Testing only!
   //  uwTick = 0x0fffffff - 4200; // Testing only!
@@ -96,20 +102,20 @@ int main(void)
   buttonLeft.setFunction([&]()
                          { timerBuzzer.setPulses(2); },
                          [&]()
-                         { printf("L_B++\r\n"); },
+                         { LOG_SWO("L_B++\r\n"); },
                          [&]()
-                         { printf("Left Button - Long pressed, TX:%d\r\n",uartCounter);
+                         {LOG_SWO("Left Button - Long pressed, TX:%d\r\n",uartCounter);
                          uartCounter++;
                          uartTxSize = sprintf(uartTxData, "UART TX test. Number of sent messages: %d.\r\n", uartCounter);
-                         printf(uartTxData);
+                        LOG_SWO(uartTxData);
                          HAL_UART_Transmit_IT(&huart2, (uint8_t *)uartTxData, uartTxSize); });
   buttonRight.setFunction([&]()
                           { timerLEDDebug.setPulses(3); },
                           [&]()
-                          { printf("R_B++\r\n"); },
+                          { LOG_SWO("R_B++\r\n"); },
                           [&]()
                           {
-                            printf("Right Button - Long pressed\r\n");
+                            LOG_SWO("Right Button - Long pressed\r\n");
                             uartTxSize = sprintf(uartTxData, "UART3 TX test. SysTick: %lu.\r\n", HAL_GetTick());
                             HAL_UART_Transmit_IT(&huart3, (uint8_t *)uartTxData, uartTxSize);
                           });
@@ -124,15 +130,27 @@ int main(void)
   timerBurst.setPulses(TIMER_INFINITE, (int32_t)uwTick + 10000);
   keyRefresh.setPulses(TIMER_INFINITE, (int32_t)uwTick);
 
-  printf("HalVersion= %lu; RevID= %lu; DevID= %lu; SystemCoreClock= %lu kHz\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID(), SystemCoreClock / 1000);
+  CycleTimer oneWireDetect(&tickWorkingCopy, 2000);
+  oneWireDetect.registerCallbacks([&]()
+                                  { timerLEDDebug.setPulses(1);
+                                  oneWireUART3.reset(); }); // add function
+  oneWireDetect.setPulses(TIMER_INFINITE, 2500);
+
+  LOG_SWO("HalVersion= %lu; RevID= %lu; DevID= %lu; SystemCoreClock= %lu kHz\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID(), SystemCoreClock / 1000);
+
+  //]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+
   while (1)
   {
-    tickWorkingCopy = HAL_GetTick();
+    tickWorkingCopy = HAL_GetTick(); // provide unchanged system time in program loop
+
     timerLEDPC13.execute();
     timerBuzzer.execute();
     timerLEDDebug.execute();
     timerBurst.execute();
     keyRefresh.execute();
+    oneWireDetect.execute();
+    oneWireUART3.uartReceive();
 
     if (lineFeed == 0x0a && __HAL_UART_GET_FLAG(&huart2, UART_FLAG_TC) == SET)
     {
@@ -142,7 +160,8 @@ int main(void)
     fastCounter++;
   }
 }
-// **************************************************************************************************************************************************************
+// ****************************************************************************************************************************
+// ****************************************************************************************************************************
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
@@ -189,7 +208,7 @@ void Error_Handler(void)
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
-  printf("Something went WRONG!!!!!! - Error Handler.");
+  LOG_SWO("Something went WRONG!!!!!! - Error Handler.");
   while (1)
   {
   }
@@ -258,7 +277,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   if (huart == &huart2)
   { // echo port
     HAL_UART_Transmit_IT(huart, (uint8_t *)&uart2RxData, 1);
-    printf("Uart2 received: %c\r\n", uart2RxData);
+    LOG_SWO("Uart2 received: %c\r\n", uart2RxData);
     if (uart2RxData == 0x0d)
     {
       lineFeed = 0x0a;
@@ -267,7 +286,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   }
   if (huart == &huart3)
   { // forward to SWO
-    printf("Uart3 received: %c\r\n", uart3RxData);
-    HAL_UART_Receive_IT(huart, (uint8_t *)&uart3RxData, 1); // Turn on receiving again
+    LOG_SWO("Uart3 received: 0x%x\r\n", oneWireUART3.mRXBuffer[0]);
+    // HAL_UART_Receive_IT(huart, (uint8_t *)uart3RxData, 1); // Turn on receiving again
+    oneWireUART3.setDataReady(1);
   }
 }
