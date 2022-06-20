@@ -27,6 +27,14 @@ uint32_t prevFastCounter = 0;
 int32_t tickWorkingCopy; // signed int to provide correct time calculation during counter overflow
 
 // ---------------------------------------------------------------------
+void sendTemperature()
+{
+  char txData[128]; // sending via uart fails when array size <80
+  uint8_t txSize;
+  txSize = sprintf(txData, "Temperatura: %.2f*C\r\n", oneWireUART3.readTemp());
+ // printf(txData);
+  HAL_UART_Transmit_IT(&huart2, (uint8_t *)txData, txSize);
+}
 
 // Set SWO pin to sendingLOG_SWO texts
 extern "C" int _write(int32_t file, uint8_t *ptr, int32_t len)
@@ -116,8 +124,12 @@ int main(void)
                           [&]()
                           {
                             LOG_SWO("Right Button - Long pressed\r\n");
-                            uartTxSize = sprintf(uartTxData, "UART3 TX test. SysTick: %lu.\r\n", HAL_GetTick());
-                            HAL_UART_Transmit_IT(&huart3, (uint8_t *)uartTxData, uartTxSize);
+                            // uartTxSize = sprintf(uartTxData, "UART3 TX test. SysTick: %lu.\r\n", HAL_GetTick());
+                            // HAL_UART_Transmit_IT(&huart3, (uint8_t *)uartTxData, uartTxSize);
+                            sendTemperature();
+                            //uartTxSize = sprintf(uartTxData, "Temperatura: %.2f*C\r\n", oneWireUART3.readTemp());
+                            // printf(txData);
+                            //HAL_UART_Transmit_IT(&huart2, (uint8_t *)uartTxData, uartTxSize);
                           });
 
   CycleTimer keyRefresh(&tickWorkingCopy, KEY_REFRESH_RATE);
@@ -130,13 +142,15 @@ int main(void)
   timerBurst.setPulses(TIMER_INFINITE, (int32_t)uwTick + 10000);
   keyRefresh.setPulses(TIMER_INFINITE, (int32_t)uwTick);
 
-  CycleTimer oneWireDetect(&tickWorkingCopy, 2000);
+  CycleTimer oneWireDetect(&tickWorkingCopy, 2000, 55);
   oneWireDetect.registerCallbacks([&]()
                                   { timerLEDDebug.setPulses(1);
-                                  oneWireUART3.readSignature();
+                                  //oneWireUART3.readSignature();
                                   oneWireUART3.measureTemp(); },
-                                  [&]()
-                                  { oneWireUART3.readTemp(); });
+                                  [&]() {  sendTemperature();
+                                    //uartTxSize = sprintf(uartTxData, "Temperatura: %.2f*C\r\n", oneWireUART3.readTemp());
+                                    //HAL_UART_Transmit_IT(&huart2, (uint8_t *)uartTxData, uartTxSize);
+                                  });
   oneWireDetect.setPulses(TIMER_INFINITE, 2500);
 
   LOG_SWO("HalVersion= %lu; RevID= %lu; DevID= %lu; SystemCoreClock= %lu kHz\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID(), SystemCoreClock / 1000);
@@ -153,7 +167,7 @@ int main(void)
     timerBurst.execute();
     keyRefresh.execute();
     oneWireDetect.execute();
-    //oneWireUART3.uartReceive();
+    // oneWireUART3.uartReceive();
 
     if (lineFeed == 0x0a && __HAL_UART_GET_FLAG(&huart2, UART_FLAG_TC) == SET)
     {
@@ -289,8 +303,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   }
   if (huart == &huart3)
   { // forward to SWO
-    //LOG_SWO("Uart3 received: 0x%x\r\n", oneWireUART3.mRXBuffer[0]);
+    // LOG_SWO("Uart3 received: 0x%x\r\n", oneWireUART3.mRXBuffer[0]);
     // HAL_UART_Receive_IT(huart, (uint8_t *)uart3RxData, 1); // Turn on receiving again
-    //oneWireUART3.setDataReady(1);
+    // oneWireUART3.setDataReady(1);
   }
 }

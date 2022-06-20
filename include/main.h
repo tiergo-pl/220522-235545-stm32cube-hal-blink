@@ -71,4 +71,5 @@ void MX_USART2_UART_Init(void);
 void MX_USART3_UART_Init(void);
 void Error_Handler(void);
 
+
 using Callback = std::function<void()>;
