@@ -22,6 +22,12 @@
 #error "Unsupported STM32 Family"
 #endif
 
+#if DEBUG_SWO
+#define LOG_SWO(...) printf(__VA_ARGS__)
+#else
+#define LOG_SWO(...)
+#endif
+
 #include <stdio.h>
 #include <functional>
 
@@ -36,7 +42,7 @@
 #define BUTTON_LEFT_MODE GPIO_MODE_INPUT, GPIO_PULLUP, GPIO_SPEED_FREQ_MEDIUM
 #define BUTTON_RIGHT GPIOB, GPIO_PIN_13
 #define BUTTON_RIGHT_MODE GPIO_MODE_INPUT, GPIO_PULLUP, GPIO_SPEED_FREQ_MEDIUM
-#define KEY_PRESSED 0 //0 if button shorts to GND with pin pulled up to V+ 
+#define KEY_PRESSED 0 // 0 if button shorts to GND with pin pulled up to V+
 #else
 #define LED_PIN GPIO_PIN_5
 #define LED_GPIO_PORT GPIOA
@@ -45,7 +51,8 @@
 #define PERIOD1 500
 #define PERIOD2 100
 #define DUTY2 10
-#define KEY_REFRESH_RATE 40 //in SysTicks (mSecs)
+#define KEY_REFRESH_RATE 40     // in SysTicks (usually mSecs)
+#define LONG_PRESS_DURATION 500 // in SysTicks (usually mSecs)
 
 // Global vars ----------------------------------------------------------
 extern UART_HandleTypeDef huart2;
@@ -53,16 +60,15 @@ extern UART_HandleTypeDef huart3;
 
 extern char uart2RxData;
 extern uint8_t lineFeed;
-extern char uart3RxData;
+extern char uart3RxData[];
 
 extern uint32_t fastCounter;
 extern uint32_t prevFastCounter;
 extern int32_t tickWorkingCopy;
 // ---------------------------------------------------------------------
 void SystemClock_Config(void);
-void MX_USART3_UART_Init(uint32_t baudRate);
 void MX_USART2_UART_Init(void);
-
+void MX_USART3_UART_Init(void);
 void Error_Handler(void);
 
 using Callback = std::function<void()>;
