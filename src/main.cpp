@@ -133,7 +133,10 @@ int main(void)
   CycleTimer oneWireDetect(&tickWorkingCopy, 2000);
   oneWireDetect.registerCallbacks([&]()
                                   { timerLEDDebug.setPulses(1);
-                                  oneWireUART3.reset(); }); // add function
+                                  oneWireUART3.readSignature();
+                                  oneWireUART3.measureTemp(); },
+                                  [&]()
+                                  { oneWireUART3.readTemp(); });
   oneWireDetect.setPulses(TIMER_INFINITE, 2500);
 
   LOG_SWO("HalVersion= %lu; RevID= %lu; DevID= %lu; SystemCoreClock= %lu kHz\r\n", HAL_GetHalVersion(), HAL_GetREVID(), HAL_GetDEVID(), SystemCoreClock / 1000);
