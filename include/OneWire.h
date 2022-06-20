@@ -9,21 +9,23 @@ private:
   UART_HandleTypeDef *pHuart;
   Callback rxFunc;
   int32_t mPrevClk = 0; // when 0 - don't count timeout, otherwise - var used to timeout calculation
-  uint8_t mTXBuffer[256];
+  uint8_t mTXBuffer[64];
   uint8_t mDataReady = 0;
 
 public:
-    uint8_t mRXBuffer[256];
-    
-OneWire(int32_t *clkSource, UART_HandleTypeDef *huart, USART_TypeDef *USART, uint32_t baudRate = 115200);
+  uint8_t mRXBuffer[64];
+  uint8_t mTXMessage[128];
+  uint8_t mRXMessage[128];
+
+  OneWire(int32_t *clkSource, UART_HandleTypeDef *huart, USART_TypeDef *USART, uint32_t baudRate = 115200);
   void uartInit();
   void uartSetBaud(uint32_t baudrate);
   UART_HandleTypeDef *getHandle();
 
   void reset();
   void resetConfirmed();
-  void write(uint8_t *);
-  uint8_t read(uint8_t *);
+  void write(uint8_t *txMessage, uint8_t messageLength);
+  uint8_t *read(uint8_t messageLength);
   void writeBit(uint8_t value);
   uint8_t readBit();
   void uartReceive();

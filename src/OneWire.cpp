@@ -26,7 +26,7 @@ OneWire::OneWire(int32_t *clkSource, UART_HandleTypeDef *huart, USART_TypeDef *U
  */
 void OneWire::uartInit()
 {
-  if (HAL_HalfDuplex_Init(pHuart) != HAL_OK)
+  if (HAL_UART_Init(pHuart) != HAL_OK)
   {
     Error_Handler();
   }
@@ -50,19 +50,15 @@ UART_HandleTypeDef *OneWire::getHandle()
 
 void OneWire::reset()
 {
-  uint8_t resetSignal = 0x00;
-  rxFunc = [this]()
-  { resetConfirmed(); };
-  uartSetBaud(19200);
+  uint8_t resetSignal = 0xf0;
+  /*rxFunc = [this]()
+  { resetConfirmed(); };*/
+  uartSetBaud(9600);
   mPrevClk = *pClkSource;
-  HAL_UART_Transmit_IT(pHuart, &resetSignal, 1);
-  HAL_UART_Receive_IT(pHuart, mRXBuffer, 1);
-}
-
-void OneWire::resetConfirmed()
-{
+  HAL_UART_Transmit(pHuart, &resetSignal, 1,1);
+  HAL_UART_Receive(pHuart, mRXBuffer, 1,1);
   uint8_t resetConfirmation = mRXBuffer[0];
-  if (resetConfirmation <= 0xff && resetConfirmation >= 0xfc)
+  if (resetConfirmation == 0xe0)
   {
     LOG_SWO("1-wire device present, reset confirmation= 0x%x\r\n", resetConfirmation);
   }
@@ -70,8 +66,68 @@ void OneWire::resetConfirmed()
   {
     LOG_SWO("1-wire device abnormal response, reset confirmation= 0x%x\r\n", resetConfirmation);
   }
-  mPrevClk = 0; // disable timeout calculation
+  //mPrevClk = 0; // disable timeout calculation
+  //rxFunc = nullptr;
   uartSetBaud(115200);
+  mTXMessage[0] = 0x33;
+  write(mTXMessage, 1);
+  read(8);
+  LOG_SWO("Received signature: 0x%2x%2x%2x%2x\r\n", mRXMessage[3], mRXMessage[2], mRXMessage[1], mRXMessage[0]);
+}
+
+void OneWire::write(uint8_t *txMessage, uint8_t messageLength)
+{
+  for (uint8_t i = 0; i < messageLength; ++i)
+  {
+    uint8_t shiftReg = txMessage[i];
+    for (uint8_t j = 0; j < 8; ++j)
+    {
+      writeBit(shiftReg & 0x01);
+      shiftReg = shiftReg >> 1;
+    }
+  }
+}
+
+uint8_t *OneWire::read(uint8_t messageLength)
+{
+  for (uint8_t i = 0; i < messageLength; ++i)
+  {
+    uint8_t shiftReg = 0;
+    for (uint8_t j = 0; j < 7; ++j)
+    {
+      shiftReg |= readBit() << 7;
+      shiftReg = shiftReg >> 1;
+    }
+    shiftReg |= readBit() << 7;
+    mRXMessage[i] = shiftReg;
+  }
+  return mRXMessage;
+}
+
+void OneWire::writeBit(uint8_t value)
+{
+  uint8_t bit0 = 0x01;
+  uint8_t bit1 = 0xff;
+  if (value)
+  {
+    HAL_UART_Transmit(pHuart, &bit1, 1, 1);
+  }
+  else
+  {
+    HAL_UART_Transmit(pHuart, &bit0, 1, 1);
+  }
+}
+
+uint8_t OneWire::readBit()
+{
+  uint8_t startPulse = 0xff;
+  uint8_t recData = 0x0;
+  //HAL_UART_Receive_IT(pHuart, &recData, 1);
+  HAL_UART_Receive(pHuart, &recData, 1,1);//flush buffer
+  HAL_UART_Transmit(pHuart, &startPulse,1,1);
+  HAL_UART_Receive(pHuart, &recData, 1, 1);
+  LOG_SWO("|%x", recData);
+  return recData & 0x01;
 }
 
 void OneWire::uartReceive()

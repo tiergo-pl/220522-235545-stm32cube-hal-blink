@@ -150,7 +150,7 @@ int main(void)
     timerBurst.execute();
     keyRefresh.execute();
     oneWireDetect.execute();
-    oneWireUART3.uartReceive();
+    //oneWireUART3.uartReceive();
 
     if (lineFeed == 0x0a && __HAL_UART_GET_FLAG(&huart2, UART_FLAG_TC) == SET)
     {
@@ -286,8 +286,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   }
   if (huart == &huart3)
   { // forward to SWO
-    LOG_SWO("Uart3 received: 0x%x\r\n", oneWireUART3.mRXBuffer[0]);
+    //LOG_SWO("Uart3 received: 0x%x\r\n", oneWireUART3.mRXBuffer[0]);
     // HAL_UART_Receive_IT(huart, (uint8_t *)uart3RxData, 1); // Turn on receiving again
-    oneWireUART3.setDataReady(1);
+    //oneWireUART3.setDataReady(1);
   }
 }
