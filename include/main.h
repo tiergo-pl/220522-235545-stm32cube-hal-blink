@@ -54,6 +54,11 @@
 #define KEY_REFRESH_RATE 40     // in SysTicks (usually mSecs)
 #define LONG_PRESS_DURATION 500 // in SysTicks (usually mSecs)
 
+#define DS18B20_01 0x47000000046dd228
+#define DS18B20_02 0x6687616bb2cfff28
+#define DS18B20_03 0xee3c21481634ff28
+#define DS18B20_04 0x3622616bb37fff28
+
 // Global vars ----------------------------------------------------------
 extern UART_HandleTypeDef huart2;
 extern UART_HandleTypeDef huart3;
