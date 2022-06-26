@@ -29,11 +29,40 @@ int32_t tickWorkingCopy; // signed int to provide correct time calculation durin
 // ---------------------------------------------------------------------
 void sendTemperature()
 {
-  char txData[128]; // sending via uart fails when array size <80
+  uint64_t devSignatures[] = {DS18B20_01, DS18B20_02, DS18B20_03, DS18B20_04};
+  char txData[256]; // sending via uart fails when array size <80
   uint8_t txSize;
-  txSize = sprintf(txData, "Temperatura: %.2f*C\r\n", oneWireUART3.readTemp());
- // printf(txData);
+  uint8_t txSizeTemp;
+  txSize = sprintf(txData, "Temperatures: ");
+  for (uint8_t i = 0; i < sizeof(devSignatures) / sizeof(uint64_t); ++i)
+  {
+    float temperature = oneWireUART3.readTemp((uint8_t *)(&devSignatures[i]));
+    if (temperature > -300)
+      txSizeTemp = sprintf(txData + txSize, "<T%u>=%6.2f*C ", i, temperature);
+    else
+      txSizeTemp = sprintf(txData + txSize, "<T%u>= *ERROR* ",i);
+    txSize += txSizeTemp;
+    LOG_SWO("Debug: line number %u, txSize = %u, i = %u\r\n", __LINE__, txSize, i);
+  }
+  txSizeTemp = sprintf(txData + txSize, "\r\n");
+  txSize += txSizeTemp;
+  // printf(txData);
   HAL_UART_Transmit_IT(&huart2, (uint8_t *)txData, txSize);
+}
+
+void printOnewireSignature()
+{
+  uint8_t txData[128]; // sending via uart fails when array size <80
+  uint8_t txSize1;
+  uint8_t txSize2;
+  uint32_t *_32bitDevSignature = (uint32_t *)oneWireUART3.readSignature();
+  // LOG_SWO("Debug: line number %u\r\n", __LINE__);
+  //  txSize1 = sprintf((char *)txData, "Signature of device: 0x%08lx.%08lx", _32bitDevSignature[1],  _32bitDevSignature[0]); // Why isnt it working??
+  txSize1 = sprintf((char *)txData, "Signature of device: 0x%08lx", _32bitDevSignature[1]);
+  // LOG_SWO("Debug: line number %u\r\n", __LINE__);
+  txSize2 = sprintf((char *)txData + txSize1, ".%08lx\r\n", _32bitDevSignature[0]); // it didn't go with one line... why?
+  // LOG_SWO("Debug: line number %u\r\n", __LINE__);
+  HAL_UART_Transmit_IT(&huart2, txData, txSize1 + txSize2);
 }
 
 // Set SWO pin to sendingLOG_SWO texts
@@ -126,10 +155,12 @@ int main(void)
                             LOG_SWO("Right Button - Long pressed\r\n");
                             // uartTxSize = sprintf(uartTxData, "UART3 TX test. SysTick: %lu.\r\n", HAL_GetTick());
                             // HAL_UART_Transmit_IT(&huart3, (uint8_t *)uartTxData, uartTxSize);
-                            sendTemperature();
-                            //uartTxSize = sprintf(uartTxData, "Temperatura: %.2f*C\r\n", oneWireUART3.readTemp());
-                            // printf(txData);
-                            //HAL_UART_Transmit_IT(&huart2, (uint8_t *)uartTxData, uartTxSize);
+                            // sendTemperature();
+                            // oneWireUART3.readSignature();
+                            printOnewireSignature();
+                            // uartTxSize = sprintf(uartTxData, "Temperatura: %.2f*C\r\n", oneWireUART3.readTemp());
+                            //  printf(txData);
+                            // HAL_UART_Transmit_IT(&huart2, (uint8_t *)uartTxData, uartTxSize);
                           });
 
   CycleTimer keyRefresh(&tickWorkingCopy, KEY_REFRESH_RATE);
@@ -142,14 +173,16 @@ int main(void)
   timerBurst.setPulses(TIMER_INFINITE, (int32_t)uwTick + 10000);
   keyRefresh.setPulses(TIMER_INFINITE, (int32_t)uwTick);
 
-  CycleTimer oneWireDetect(&tickWorkingCopy, 2000, 55);
+  CycleTimer oneWireDetect(&tickWorkingCopy, 2000, 90);
   oneWireDetect.registerCallbacks([&]()
                                   { timerLEDDebug.setPulses(1);
                                   //oneWireUART3.readSignature();
                                   oneWireUART3.measureTemp(); },
-                                  [&]() {  sendTemperature();
-                                    //uartTxSize = sprintf(uartTxData, "Temperatura: %.2f*C\r\n", oneWireUART3.readTemp());
-                                    //HAL_UART_Transmit_IT(&huart2, (uint8_t *)uartTxData, uartTxSize);
+                                  [&]()
+                                  {
+                                    sendTemperature();
+                                    // uartTxSize = sprintf(uartTxData, "Temperatura: %.2f*C\r\n", oneWireUART3.readTemp());
+                                    // HAL_UART_Transmit_IT(&huart2, (uint8_t *)uartTxData, uartTxSize);
                                   });
   oneWireDetect.setPulses(TIMER_INFINITE, 2500);
 

@@ -48,7 +48,7 @@ UART_HandleTypeDef *OneWire::getHandle()
   return pHuart;
 }
 
-void OneWire::reset()
+ErrorStatus OneWire::reset()
 {
   uint8_t resetSignal = 0xf0;
   /*rxFunc = [this]()
@@ -57,56 +57,90 @@ void OneWire::reset()
   mPrevClk = *pClkSource;
   HAL_UART_Transmit(pHuart, &resetSignal, 1, 1);
   HAL_UART_Receive(pHuart, mRXBuffer, 1, 1);
+  uartSetBaud(115200);
   uint8_t resetConfirmation = mRXBuffer[0];
-  if (resetConfirmation == 0xe0)
+  if (resetConfirmation != 0xf0)
   {
     LOG_SWO("1-wire device present, reset confirmation= 0x%x\r\n", resetConfirmation);
+    return SUCCESS;
   }
   else
   {
     LOG_SWO("1-wire device abnormal response, reset confirmation= 0x%x\r\n", resetConfirmation);
+    return ERROR;
   }
   // mPrevClk = 0; // disable timeout calculation
   // rxFunc = nullptr;
-  uartSetBaud(115200);
 }
 
 uint8_t *OneWire::readSignature()
 {
-  reset();
-  mTXMessage[0] = 0x33;
-  write(mTXMessage, 1);
-  read(8);
-  for (uint8_t i = 0; i < 8; ++i)
+  if (reset() == ERROR)
   {
-    mDevSignature[i] = mRXMessage[i];
+    return nullptr;
   }
-  uint32_t *_32bitSignature = (uint32_t *)mDevSignature;
-  LOG_SWO("Received signature: 0x%lx.%lx\r\n", _32bitSignature[1], _32bitSignature[0]);
-  return mDevSignature;
+  else
+  {
+    mTXMessage[0] = ONEWIRE_READ_ROM;
+    write(mTXMessage, 1);
+    read(8);
+    for (uint8_t i = 0; i < 8; ++i)
+    {
+      mDevSignature[i] = mRXMessage[i];
+    }
+    uint32_t *_32bitSignature = (uint32_t *)mDevSignature;
+    LOG_SWO("Received signature: 0x%08lx.%08lx\r\n", _32bitSignature[1], _32bitSignature[0]);
+    return mDevSignature;
+  }
 }
 
-void OneWire::measureTemp()
+ErrorStatus OneWire::measureTemp()
 {
-  reset();
-  mTXMessage[0] = 0xcc;
-  mTXMessage[1] = 0x44;
-  write(mTXMessage, 2);
+  if (reset() == ERROR)
+  {
+    return ERROR;
+  }
+  else
+  {
+    mTXMessage[0] = ONEWIRE_SKIP_ROM;
+    mTXMessage[1] = ONEWIRE_CONVERT_T;
+    write(mTXMessage, 2);
+    return SUCCESS;
+  }
 }
 
-float OneWire::readTemp()
+float OneWire::readTemp(uint8_t *devSignature)
 {
-  reset();
-  mTXMessage[0] = 0xcc;
-  mTXMessage[1] = 0xbe;
-  write(mTXMessage, 2);
+  if (reset() == SUCCESS)
+  {if (devSignature == nullptr)
+  {
+      mTXMessage[0] = ONEWIRE_SKIP_ROM;
+      mTXMessage[1] = ONEWIRE_READ_SCRATCHPAD;
+      write(mTXMessage, 2);
+
+  }
+  else
+  {
+      mTXMessage[0] = ONEWIRE_MATCH_ROM;
+      for (uint8_t i = 0; i < 8; ++i)
+      {
+        mTXMessage[i + 1] = devSignature[i];
+      }
+      mTXMessage[9] = ONEWIRE_READ_SCRATCHPAD;
+      write(mTXMessage, 10);
+  }
   read(9);
-  LOG_SWO("Received scratchpad: 0x%x.%x.%x.%x.%x.%x.%x.%x.%x\r\n",
+  LOG_SWO("Received scratchpad: 0x%02x.%02x.%02x.%02x.%02x.%02x.%02x.%02x.%02x\r\n",
           mRXMessage[8], mRXMessage[7], mRXMessage[6], mRXMessage[5], mRXMessage[4], mRXMessage[3], mRXMessage[2], mRXMessage[1], mRXMessage[0]);
   int16_t *intTemp = (int16_t *)mRXMessage;
   float temperature = intTemp[0] / 16.0f;
   LOG_SWO("intTemp: %d, Temperature: %.1f*C\r\n", intTemp[0], temperature);
   return temperature;
+  }
+  else
+  {
+    return -333;
+  }
 }
 
 void OneWire::write(uint8_t *txMessage, uint8_t messageLength)
