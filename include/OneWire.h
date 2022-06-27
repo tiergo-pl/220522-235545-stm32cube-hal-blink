@@ -39,6 +39,8 @@ public:
   // @param devSignature pointer to 8-byte device signature; when using only one device on bus you can leave empty
   float readTemp(uint8_t *devSignature = nullptr);
 
+  uint8_t crc(uint8_t * data, uint8_t nbrOfBytes);
+
   void write(uint8_t *txMessage, uint8_t messageLength);
   void writeBit(uint8_t value);
   uint8_t *read(uint8_t messageLength);

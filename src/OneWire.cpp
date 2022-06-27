@@ -88,6 +88,11 @@ uint8_t *OneWire::readSignature()
     {
       mDevSignature[i] = mRXMessage[i];
     }
+    if (crc(mRXMessage, 8) != 0) // crc=0 when no error
+    {
+      return nullptr;
+    }
+
     uint32_t *_32bitSignature = (uint32_t *)mDevSignature;
     LOG_SWO("Received signature: 0x%08lx.%08lx\r\n", _32bitSignature[1], _32bitSignature[0]);
     return mDevSignature;
@@ -112,35 +117,61 @@ ErrorStatus OneWire::measureTemp()
 float OneWire::readTemp(uint8_t *devSignature)
 {
   if (reset() == SUCCESS)
-  {if (devSignature == nullptr)
   {
+    if (devSignature == nullptr) // when reading only one sensor
+    {
       mTXMessage[0] = ONEWIRE_SKIP_ROM;
       mTXMessage[1] = ONEWIRE_READ_SCRATCHPAD;
       write(mTXMessage, 2);
-
-  }
-  else
-  {
-      mTXMessage[0] = ONEWIRE_MATCH_ROM;
+    }
+    else
+    {
+      mTXMessage[0] = ONEWIRE_MATCH_ROM; // when multi sensor bus reading
       for (uint8_t i = 0; i < 8; ++i)
       {
         mTXMessage[i + 1] = devSignature[i];
       }
       mTXMessage[9] = ONEWIRE_READ_SCRATCHPAD;
       write(mTXMessage, 10);
-  }
-  read(9);
-  LOG_SWO("Received scratchpad: 0x%02x.%02x.%02x.%02x.%02x.%02x.%02x.%02x.%02x\r\n",
-          mRXMessage[8], mRXMessage[7], mRXMessage[6], mRXMessage[5], mRXMessage[4], mRXMessage[3], mRXMessage[2], mRXMessage[1], mRXMessage[0]);
-  int16_t *intTemp = (int16_t *)mRXMessage;
-  float temperature = intTemp[0] / 16.0f;
-  LOG_SWO("intTemp: %d, Temperature: %.1f*C\r\n", intTemp[0], temperature);
-  return temperature;
+    }
+    read(9);
+    LOG_SWO("Received scratchpad: 0x%02x.%02x.%02x.%02x.%02x.%02x.%02x.%02x.%02x\r\n",
+            mRXMessage[8], mRXMessage[7], mRXMessage[6], mRXMessage[5], mRXMessage[4], mRXMessage[3], mRXMessage[2], mRXMessage[1], mRXMessage[0]);
+    if (crc(mRXMessage, 9) != 0) // crc=0 when no error 
+    {
+      return -400;
+    }
+
+    int16_t *intTemp = (int16_t *)mRXMessage;
+    float temperature = intTemp[0] / 16.0f;
+    LOG_SWO("intTemp: %d, Temperature: %.1f*C\r\n", intTemp[0], temperature);
+    return temperature;
   }
   else
   {
     return -333;
   }
+}
+
+uint8_t OneWire::crc(uint8_t *data, uint8_t nbrOfBytes)
+{
+  uint8_t crc = 0;
+  uint8_t byteCtr;
+  // calculates 8-Bit checksum
+  for (byteCtr = 0; byteCtr < nbrOfBytes; ++byteCtr)
+  {
+
+    crc ^= (data[byteCtr]);
+    for (uint8_t bit = 0; bit < 8; ++bit)
+    {
+      if (crc & 0x01)
+        crc = (crc >> 1) ^ 0x8c; // polynomial Maxim 0x31 - reversed order
+      else
+        crc = (crc >> 1);
+    }
+  }
+  LOG_SWO("CRC= 0x%02x\r\n", crc);
+  return crc;
 }
 
 void OneWire::write(uint8_t *txMessage, uint8_t messageLength)

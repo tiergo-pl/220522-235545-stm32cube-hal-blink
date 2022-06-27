@@ -40,7 +40,7 @@ void sendTemperature()
     if (temperature > -300)
       txSizeTemp = sprintf(txData + txSize, "<T%u>=%6.2f*C ", i, temperature);
     else
-      txSizeTemp = sprintf(txData + txSize, "<T%u>= *ERROR* ",i);
+      txSizeTemp = sprintf(txData + txSize, "<T%u>= *ERROR* ", i);
     txSize += txSizeTemp;
     LOG_SWO("Debug: line number %u, txSize = %u, i = %u\r\n", __LINE__, txSize, i);
   }
@@ -56,12 +56,20 @@ void printOnewireSignature()
   uint8_t txSize1;
   uint8_t txSize2;
   uint32_t *_32bitDevSignature = (uint32_t *)oneWireUART3.readSignature();
-  // LOG_SWO("Debug: line number %u\r\n", __LINE__);
-  //  txSize1 = sprintf((char *)txData, "Signature of device: 0x%08lx.%08lx", _32bitDevSignature[1],  _32bitDevSignature[0]); // Why isnt it working??
-  txSize1 = sprintf((char *)txData, "Signature of device: 0x%08lx", _32bitDevSignature[1]);
-  // LOG_SWO("Debug: line number %u\r\n", __LINE__);
-  txSize2 = sprintf((char *)txData + txSize1, ".%08lx\r\n", _32bitDevSignature[0]); // it didn't go with one line... why?
-  // LOG_SWO("Debug: line number %u\r\n", __LINE__);
+  if (_32bitDevSignature != nullptr)
+  {
+    // LOG_SWO("Debug: line number %u\r\n", __LINE__);
+    //  txSize1 = sprintf((char *)txData, "Signature of device: 0x%08lx.%08lx", _32bitDevSignature[1],  _32bitDevSignature[0]); // Why isnt it working??
+    txSize1 = sprintf((char *)txData, "Signature of device: 0x%08lx", _32bitDevSignature[1]);
+    // LOG_SWO("Debug: line number %u\r\n", __LINE__);
+    txSize2 = sprintf((char *)txData + txSize1, ".%08lx\r\n", _32bitDevSignature[0]); // it didn't go with one line... why?
+    // LOG_SWO("Debug: line number %u\r\n", __LINE__);
+  }
+  else
+  {
+    txSize1 = sprintf((char *)txData, "CRC Error!!, connect only one device!!!\r\n");
+    txSize2 = 0;
+  }
   HAL_UART_Transmit_IT(&huart2, txData, txSize1 + txSize2);
 }
 
