@@ -5,6 +5,7 @@
 #include "pins.h"
 #include "timers.h"
 #include "OneWire.h"
+#include "LCD.h"
 
 /*
 // Testing purposes only====================================================
@@ -17,6 +18,7 @@ volatile int64_t checkSize[CHECK_SIZE_LEN];
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 OneWire oneWireUART3(&tickWorkingCopy, &huart3, USART3);
+LCD lcd(LCD_RS_RW, LCD_ENABLE, LCD_4BIT_DATA);
 
 char uart2RxData;
 uint8_t lineFeed = 0;
@@ -41,6 +43,7 @@ void sendTemperature()
       txSizeTemp = sprintf(txData + txSize, "<T%u>=%6.2f*C ", i, temperature);
     else
       txSizeTemp = sprintf(txData + txSize, "<T%u>= *ERROR* ", i);
+    
     txSize += txSizeTemp;
     LOG_SWO("Debug: line number %u, txSize = %u, i = %u\r\n", __LINE__, txSize, i);
   }
@@ -48,6 +51,14 @@ void sendTemperature()
   txSize += txSizeTemp;
   // printf(txData);
   HAL_UART_Transmit_IT(&huart2, (uint8_t *)txData, txSize);
+  lcd.writeCommand(0x80);
+  int charIndex = 14;
+  for ( ; charIndex < 28;++charIndex)
+    lcd.writeData(txData[charIndex]);
+  lcd.writeCommand(0x80 | 40);
+  for (; charIndex < 42; ++charIndex)
+    lcd.writeData(txData[charIndex]);
+
 }
 
 void printOnewireSignature()
@@ -120,10 +131,29 @@ int main(void)
   pinSetup(BUTTON_RIGHT, BUTTON_RIGHT_MODE);
   // MX_USB_DEVICE_Init();
   LOG_SWO("Debug: line number %u\r\n", __LINE__);
+  lcd.init(LCD_PIN_MODE);
+  lcd.set4bitMode();
+  lcd.writeCommand(0x06);
+  lcd.writeCommand(0x0c);
+  lcd.clearDisplay();
+  lcd.writeCommand(0x80);
 
-  //  uwTick = (uint32_t)(-4200); // Testing only!
-  //  uwTick = 0x0fffffff - 4200; // Testing only!
-  CycleTimer timerLEDPC13(&tickWorkingCopy, PERIOD1);
+  /*lcd.writeData(0xff);
+  lcd.writeData('b');
+  lcd.writeCommand(0x88);
+  lcd.writeData('g');
+  lcd.writeData('S');
+  lcd.writeData('R');*/
+  char lcdString[] = "<LCD ready>";
+  int charIndex = 0;
+  while (lcdString[charIndex]!=0)
+  {
+    lcd.writeData(lcdString[charIndex]);
+    ++charIndex;
+  }
+    //  uwTick = (uint32_t)(-4200); // Testing only!
+    //  uwTick = 0x0fffffff - 4200; // Testing only!
+    CycleTimer timerLEDPC13(&tickWorkingCopy, PERIOD1);
   timerLEDPC13.registerCallbacks([&]()
                                  {HAL_GPIO_TogglePin(LED_PC13);
                                  //printf("SysTick= %lu; LED toggled. fastCounter= %lu, fastCounter cycles= %lu\r\n", HAL_GetTick(), fastCounter, fastCounter - prevFastCounter);
